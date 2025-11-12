@@ -1,0 +1,129 @@
+# to think:
+# Run responses in eager mode? If True and one of the responses fails it will just ignore and keep running the
+# other items. Otherwise it will stop if one of the responses fails. Usefull for separate "close down" operations
+# where you need to make sure you tried to close everything regardless of any problem from "open" operations where
+# you want the queue to stop if one of the responses fails (e.g. open dome, open mirror and take flats).
+
+# - Conditions: there is no OR conditions, all conditions must be met (AND);
+#   OR is defined by having multiple checklists
+# - Responses: list of actions to take if all conditions are met
+
+# Chimera supervisor configuration file example
+
+# actions without conditions to be called explicitly
+close_all:
+  # conditions: no conditions means that will only run when explicitly called
+  responses:
+    - type: telescope:mirror_cover
+      action: close # close the mirror covers
+    - type: dome:flap
+      action: close # close the dome - flap
+    - type: dome:slit
+      action: close # close the dome - slit
+    - type: telescope:park
+      action: set # park the telescope
+    - type: dome:park
+      action: set # move dome to configured park position
+###
+
+# Daytime safety locks and checks
+set_daytime_lock:
+  conditions:
+    - type: site:lock
+      key: daytime
+      value: False
+    - type: sun:altitude
+      operator: greater_than
+      value: 0.0
+  responses:
+    - type: site:lock
+      key: daytime
+      duration: 120 # lock the dome for 2 hours during daytime - this is arbitrary long to avoid repeated checks
+
+clear_daytime_lock:
+  conditions:
+    - type: site:lock
+      key: daytime
+      value: True
+    - type: sun:altitude
+      operator: less_than
+      value: 0.0
+  responses:
+    - type: site:unlock
+      key: daytime
+
+enforce_site_locks:
+  conditions:
+    - type: site:lock
+      key: '*' # any site lock is active
+      value: True
+    - type: dome:slit
+      operator: equals
+      value: open
+  responses:
+    - type: call_action
+      action: close_all
+###
+
+# Meteorological safety locks and checks
+# dewpoint
+close_on_dewpoint:
+  conditions:
+    - type: dome:slit # dome is open
+      operator: equals
+      value: open
+    - type: dewpoint:diff # dewpoint difference to the ambient temperature is
+      operator: greater_than #  more than
+      value: 4.0 # degrees Celsius
+  responses:
+    - type: call_action # calls another action defined in this file
+      action: close_all # put the dome and telescope in safe position
+    - type: dome:lock # locks the dome for some duration to avoid repeated open/close cycles
+      key: dewpoint
+      duration: 30 # lock the system for 30 minutes
+
+lock_on_dewpoint: # locks the dome if dewpoint is high during daytime
+  conditions:
+    - type: site:lock
+      key: daytime
+      value: True
+    - type: dome:lock
+      key: dewpoint
+      value: False
+    - type: weather:dewpoint_diff
+      operator: greater_than
+      value: 4.0
+  responses:
+    - type: lock
+      obj: dome
+      key: dewpoint
+      duration: 60 # lock the system on dew for 60 minutes during daytime
+
+# todo: rain
+# todo: wind
+# todo: humidity
+# todo: transparency -> observe between clouds only if transparency is good enough
+
+check_dome_lock: # check if dome is locked and still open -> extra safety
+  conditions:
+    - type: dome:lock
+      key: '*'
+      value: True
+    - type: dome:slit
+      operator: equals
+      value: open
+  responses:
+    - type: call_action
+      action: close_all
+
+###
+
+# daylight operations examples
+run_observing_prep:
+  conditions:
+    - type: "cron:time" # can this may be added to the system-wide cron jobs? Cronitor?
+      time: "0 14 * * *" # 2 PM every day
+  responses:
+    - type: call_script
+      script: "/path/to/observing_prep_script.sh" # script to prepare for observing
+###
