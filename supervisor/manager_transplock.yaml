@@ -1,0 +1,112 @@
+checklist:
+  - name: DailightTransparencyLock
+    eager: False
+    active: True
+    check: 
+      - type: CheckTransparency
+        transparency: 35
+      - type: CheckDome
+        mode: 1
+      - type: CheckInstrumentFlag
+        instrument: site
+        flag: transparency
+        mode: 3
+    responses:
+      - type: LockInstrument
+        instrument: site
+        key: transparency
+      - type: SendPhoto
+        path: /mnt/public/allsky/AllSkyCurrentImage.JPG
+
+  - name: TransparencyLock
+    eager: False
+    active: True
+    check: 
+      - type: CheckTransparency
+        transparency: 35
+      - type: CheckDome
+        mode: 0
+      - type: CheckInstrumentFlag
+        instrument: dome
+        flag: transparency
+        mode: 3
+#      - type: AskListener
+#        question: Transparency bellow threshold. StopAll and lock dome?
+#        waittime: 120
+    responses:
+#      - type: ExecuteScript
+#        filename: /home/chimera/.chimera/m2law_stop.sh
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanEast
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanWest
+      - type: StopAll
+      - type: TelescopeAction
+        mode: 3
+      - type: DomeAction
+        mode: 1
+      - type: LockInstrument
+        instrument: site
+        key: transparency
+      - type: SendPhoto
+        path: /mnt/public/allsky/AllSkyCurrentImage.JPG
+
+#
+#  - name: TransparencyLock
+#    eager: False
+#    active: True
+#    check: 
+#      - type: CheckTransparency
+#        transparency: 35
+#      - type: CheckDome
+#        mode: 0
+##      - type: AskListener
+##        question: Transparency bellow threshold. StopAll and lock dome?
+##        waittime: 120
+#    responses:
+##      - type: ExecuteScript
+##        filename: /home/chimera/.chimera/m2law_stop.sh
+#      - type: DomeAction
+#        mode: 6
+#        parameter: /CSKFan/DomeFanEast
+#      - type: DomeAction
+#        mode: 6
+#        parameter: /CSKFan/DomeFanWest
+#      - type: StopAll
+#      - type: TelescopeAction
+#        mode: 3
+#      - type: DomeAction
+#        mode: 1
+#      - type: LockInstrument
+#        instrument: site
+#        key: transparency
+#
+#  - name: DailightTransparencyLock
+#    eager: False
+#    active: True
+#    check: 
+#      - type: CheckTransparency
+#        transparency: 35
+#      - type: CheckDome
+#        mode: 1
+#    responses:
+#      - type: LockInstrument
+#        instrument: site
+#        key: transparency
+#
+#  - name: TransparencyLock
+#    eager: False
+#    check: 
+#      - type: CheckTransparency
+#        transparency: 30
+#    responses:
+#      - type: StopAll
+#      - type: TelescopeAction
+#        mode: 3
+#      - type: DomeAction
+#        mode: 1
+#      - type: LockInstrument
+#        instrument: site
+#        key: transparency

@@ -1,0 +1,12 @@
+checklist:
+  CleanQueueBadWeather:
+    active: false
+    conditions:
+    - condition: ask_operator
+      question: Test action?
+      timeout: 2m
+    responses:
+    - action: run_script
+      path: /mnt/public/t80s_scripts/scripts/clear_queue_badweather.sh
+    - action: send_photo
+      url: /mnt/public/allsky/AllSkyCurrentImage.JPG

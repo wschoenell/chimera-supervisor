@@ -1,0 +1,14 @@
+checklist:
+
+  - name: SchedulerInError
+    eager: False
+    eager_response: False
+    active: False
+    comment: Run when there is an error with the scheduler
+    check:
+      - type: AskListener
+        question: Stop Scheduler?
+        waittime: 120
+    responses:
+      - type: StopAll
+

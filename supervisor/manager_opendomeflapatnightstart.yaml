@@ -1,0 +1,39 @@
+checklist: 
+
+  - name: OpenDomeFlapAtNightStart
+    eager: False
+    eager_response: False
+    comment: Prepare telescope for night start.
+    check:
+      - type: CheckTime
+        mode: 3
+        deltaTime: -0.6
+      - type: CheckTime
+        mode: -3
+        deltaTime: 0.0
+      - type: CheckDome
+        mode: 0
+#      - type: CheckDome
+#        mode: 3
+#      - type: AskListener
+#        question: Night starting! Open dome flap, telescope cover and switch off fans?
+#        waittime: 120
+    responses:
+      - type: DomeAction
+        mode: 2
+      - type: DomeAction
+        mode: 9
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanEast
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanWest
+      - type: TelescopeAction
+        mode: 2
+      - type: TelescopeAction
+        mode: 9
+        parameter: /SchneiderOTBFan/M1
+      - type: ExecuteScript
+        filename: /mnt/public/t80s_scripts/scripts/switch_lamp_off.sh
+      - type: StartRobObs

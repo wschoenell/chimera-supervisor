@@ -1,0 +1,15 @@
+checklist:
+
+  - name: CheckTelescopeParked
+    eager: False
+    check:
+      - type: CheckTelescope
+        mode: 1
+      - type: CheckInstrumentFlag
+        instrument: telescope
+        mode: 0
+        flag: CLOSE
+    responses:
+      - type: SetInstrumentFlag
+        instrument: telescope
+        flag: 3

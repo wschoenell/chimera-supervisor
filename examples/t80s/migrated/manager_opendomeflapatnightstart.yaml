@@ -1,0 +1,32 @@
+checklist:
+  OpenDomeFlapAtNightStart:
+    description: Prepare telescope for night start.
+    on_error: abort
+    conditions:
+    - condition: time
+      after: sunset_twilight_end
+      offset: -36m
+    - condition: time
+      before: sunset_twilight_end
+    - condition: dome
+      slit: open
+    responses:
+    - action: dome
+      do: open_flap
+    - action: dome
+      do: track
+    - action: fan
+      do: switch_off
+      fan: /CSKFan/DomeFanEast
+    - action: fan
+      do: switch_off
+      fan: /CSKFan/DomeFanWest
+    - action: telescope
+      do: open_cover
+    - action: fan
+      do: switch_off
+      fan: /SchneiderOTBFan/M1
+    - action: run_script
+      path: /mnt/public/t80s_scripts/scripts/switch_lamp_off.sh
+    - action: robobs
+      do: start

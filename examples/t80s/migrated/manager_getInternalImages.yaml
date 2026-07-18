@@ -1,0 +1,12 @@
+checklist:
+  GetInternalImages:
+    active: false
+    conditions:
+    - condition: ask_operator
+      question: Send AllSky Image?
+      timeout: 2m
+    responses:
+    - action: send_photo
+      url: http://192.168.20.102/axis-cgi/jpg/image.cgi?resolution=320x240
+    - action: send_photo
+      url: http://192.168.20.104/axis-cgi/jpg/image.cgi?resolution=352x240

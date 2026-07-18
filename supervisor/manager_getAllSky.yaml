@@ -1,0 +1,11 @@
+checklist:
+  - name: GetAllSky 
+    eager: False
+    active: False
+    check:
+     - type: AskListener
+       question: Send AllSky Image? 
+       waittime: 120
+    responses:
+      - type: SendPhoto
+        path: /mnt/public/allsky/AllSkyCurrentImage.JPG

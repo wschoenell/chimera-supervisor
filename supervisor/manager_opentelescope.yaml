@@ -1,0 +1,17 @@
+checklist:
+  - name: OpenTelescope
+    eager: False
+    active: False
+    check:
+     - type: AskListener
+       question: Completely open the telescope?
+       waittime: 120
+    responses:
+      - type: TelescopeAction
+        mode: 0
+      - type: DomeAction
+        mode: 0
+      - type: TelescopeAction
+        mode: 2
+      - type: DomeAction
+        mode: 2

@@ -1,0 +1,185 @@
+checklist:
+
+  - name: CloseOnHumidity
+    eager: False
+    comment: Stop all instruments, close telescope and dome if humidity is higher than threshold 
+    check:
+      - type: CheckHumidity
+        humidity: 85.0
+      - type: CheckInstrumentFlag
+        instrument: dome
+        flag: humidity
+        mode: 3
+    responses:
+#      - type: ExecuteScript
+#        filename: /home/chimera/.chimera/m2law_stop.sh
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanEast
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanWest
+      - type: TelescopeAction
+        mode: 9
+        parameter: /SchneiderOTBFan/M1
+      - type: StopAll
+      - type: TelescopeAction
+        mode: 3
+      - type: DomeAction
+        mode: 1
+      - type: LockInstrument
+        instrument: dome
+        key: humidity
+
+  - name: CloseOnDew
+    eager: False
+    comment: Stop all instruments, close telescope and dome if temperature is closer than threshold from dew point
+    check:
+      - type: CheckDew
+        tempdiff: 4
+      - type: CheckInstrumentFlag
+        instrument: dome
+        flag: dew
+        mode: 3
+    responses:
+#      - type: ExecuteScript
+#        filename: /home/chimera/.chimera/m2law_stop.sh
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanEast
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanWest
+      - type: TelescopeAction
+        mode: 9
+        parameter: /SchneiderOTBFan/M1
+      - type: StopAll
+      - type: TelescopeAction
+        mode: 3
+      - type: DomeAction
+        mode: 1
+      - type: LockInstrument
+        instrument: dome
+        key: dew
+
+  - name: CloseOnWind
+    eager: False
+    comment: Stop all instruments, close telescope and dome if wind is higher than threshold
+    check:
+      - type: CheckWindSpeed
+        windspeed: 16.0
+      - type: CheckInstrumentFlag
+        instrument: dome
+        flag: wind
+        mode: 3
+    responses:
+ #     - type: ExecuteScript
+ #       filename: /home/chimera/.chimera/m2law_stop.sh
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanEast
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanWest
+      - type: TelescopeAction
+        mode: 9
+        parameter: /SchneiderOTBFan/M1
+      - type: StopAll
+      - type: TelescopeAction
+        mode: 3
+      - type: DomeAction
+        mode: 1
+      - type: LockInstrument
+        instrument: dome
+        key: wind
+
+  - name: TransparencyLock
+    eager: False
+    active: False
+    check: 
+      - type: CheckTransparency
+        transparency: 32
+      - type: CheckDome
+        mode: 0
+      - type: CheckInstrumentFlag
+        instrument: dome
+        flag: transparency
+        mode: 3
+#      - type: AskListener
+#        question: Transparency bellow threshold. StopAll and lock dome?
+#        waittime: 120
+    responses:
+#      - type: ExecuteScript
+#        filename: /home/chimera/.chimera/m2law_stop.sh
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanEast
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanWest
+      - type: TelescopeAction
+        mode: 9
+        parameter: /SchneiderOTBFan/M1
+      - type: StopAll
+      - type: TelescopeAction
+        mode: 3
+      - type: DomeAction
+        mode: 1
+      - type: LockInstrument
+        instrument: site
+        key: transparency
+
+#  - name: DailightTransparencyLock
+#    eager: False
+#    active: False
+#    check: 
+#      - type: CheckTransparency
+#        transparency: 35
+#      - type: CheckDome
+#        mode: 1
+#    responses:
+#      - type: LockInstrument
+#        instrument: site
+#        key: transparency
+#
+#  - name: DailightCloseOnHumidity
+#    eager: False
+#    active: False
+#    comment: Stop all instruments, close telescope and dome if humidity is higher than threshold 
+#    check:
+#      - type: CheckHumidity
+#        humidity: 85.0
+#      - type: CheckDome
+#        mode: 1
+#    responses:
+#      - type: LockInstrument
+#        instrument: dome
+#        key: humidity
+#
+#  - name: DailightCloseOnDew
+#    active: False
+#    eager: False
+#    comment: Stop all instruments, close telescope and dome if temperature is closer than threshold from dew point
+#    check:
+#      - type: CheckDew
+#        tempdiff: 4
+#      - type: CheckDome
+#        mode: 1
+#    responses:
+#      - type: LockInstrument
+#        instrument: dome
+#        key: dew
+#
+#  - name: DailightOnWind
+#    eager: False
+#    active: False
+#    comment: Stop all instruments, close telescope and dome if wind is higher than threshold
+#    check:
+#      - type: CheckWindSpeed
+#        windspeed: 25.0
+#      - type: CheckDome
+#        mode: 1
+#    responses:
+#      - type: LockInstrument
+#        instrument: dome
+#        key: wind

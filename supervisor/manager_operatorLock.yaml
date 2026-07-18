@@ -1,0 +1,47 @@
+checklist:
+
+  - name: OperatorLock
+    eager: False
+    active: False
+    check:
+     - type: AskListener
+       question: Lock telescope?
+       waittime: 120
+    responses:
+      - type: LockInstrument
+        instrument: dome
+        key: operator
+      - type: StopAll
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanEast
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanWest
+      - type: TelescopeAction
+        mode: 9
+        parameter: /SchneiderOTBFan/M1
+      - type: TelescopeAction
+        mode: 3
+      - type: DomeAction
+        mode: 1
+      - type: DomeAction
+        mode: 4
+        parameter: 90
+
+  - name: OperatorUnLock
+    eager: False
+    eager_response: False
+    active: False
+    comment: Unlock dome and site by operator.
+    check:
+    - type: AskListener
+      question: Unlock site and dome?
+      waittime: 120
+    responses:
+      - type: UnlockInstrument
+        instrument: dome
+        key: operator
+      - type: SetInstrumentFlag
+        instrument: dome
+        flag: 1

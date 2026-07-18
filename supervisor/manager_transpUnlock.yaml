@@ -1,0 +1,24 @@
+checklist:
+
+  - name: TestTransparencyUnLock
+    eager: False
+    check: 
+      - type: CheckTransparency
+        transparency: 40
+        mode: 1
+        deltaTime: 0.25
+      - type: CheckInstrumentFlag
+        instrument: site
+        flag: transparency
+        mode: 2
+    responses:
+#      - type: SendTelegram
+#        message: Transparency OK!
+      - type: UnLockInstrument
+        instrument: site
+        key: transparency
+      - type: SetInstrumentFlag
+        instrument: site
+        flag: 1
+      - type: SendPhoto
+        path: /mnt/public/allsky/AllSkyCurrentImage.JPG

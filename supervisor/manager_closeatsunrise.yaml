@@ -1,0 +1,50 @@
+checklist:
+  - name: LockDomeOnSunrise
+    eager: False
+    comment: Stop all instruments, close telescope and dome, and lock dome at sunrise.
+    check:
+      - type: CheckTime
+        mode: 4
+        deltaTime: 0.1
+    responses:
+      - type: StopAll
+      - type: DomeAction
+        mode: 5
+        parameter: /CSKFan/DomeFanEast,300
+      - type: DomeAction
+        mode: 5
+        parameter: /CSKFan/DomeFanWest,300
+      - type: TelescopeAction
+        mode: 9
+        parameter: /SchneiderOTBFan/M1
+      - type: TelescopeAction
+        mode: 3
+      - type: DomeAction
+        mode: 1
+      - type: DomeAction
+        mode: 4
+        parameter: 90
+      - type: TelescopeAction
+        mode: 1
+      - type: LockInstrument
+        instrument: dome
+        key: sunup
+      - type: ConfigureScheduler
+        filename: "/mnt/public/t80s_scripts/scheduler/bias.yaml"
+      - type: StartScheduler
+      - type: SendPhoto
+        path: http://192.168.20.102/axis-cgi/jpg/image.cgi?resolution=320x240
+      - type: SendPhoto
+        path: http://192.168.20.104/axis-cgi/jpg/image.cgi?resolution=352x240
+
+#  - name: SwitchDomeLightOnSunrise
+#    eager: False
+#    comment: Stop all instruments, close telescope and dome, and lock dome at sunrise.
+#    check:
+#      - type: CheckTime
+#        mode: 4
+#        deltaTime: 0.2
+#    responses:
+#      - type: DomeAction
+#        mode: 7
+#        parameter: /SchneiderOTBLamp/building

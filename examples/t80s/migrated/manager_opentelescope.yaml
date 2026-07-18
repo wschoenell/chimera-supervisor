@@ -1,0 +1,16 @@
+checklist:
+  OpenTelescope:
+    active: false
+    conditions:
+    - condition: ask_operator
+      question: Completely open the telescope?
+      timeout: 2m
+    responses:
+    - action: telescope
+      do: unpark
+    - action: dome
+      do: open_slit
+    - action: telescope
+      do: open_cover
+    - action: dome
+      do: open_flap

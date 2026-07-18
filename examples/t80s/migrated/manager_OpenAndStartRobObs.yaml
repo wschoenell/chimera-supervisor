@@ -1,0 +1,33 @@
+checklist:
+  OpenAndStartRoboObs:
+    description: Open dome and telescope and start robobs
+    active: false
+    on_error: abort
+    conditions:
+    - condition: ask_operator
+      question: Open telescope and start RoboObs?
+      timeout: 2m
+    responses:
+    - action: set_flag
+      instrument: site
+      flag: ready
+    - action: set_flag
+      instrument: scheduler
+      flag: ready
+    - action: telescope
+      do: unpark
+    - action: dome
+      do: open_slit
+    - action: lamp
+      do: switch_off
+      lamp: /SchneiderOTBLamp/building
+    - action: dome
+      do: open_flap
+    - action: telescope
+      do: open_cover
+    - action: run_script
+      path: /mnt/public/t80s_scripts/scripts/switch_lamp_off.sh
+    - action: robobs
+      do: start
+    - action: dome
+      do: track

@@ -1,0 +1,54 @@
+checklist:
+  - name: CloseTelescope
+    eager: False
+    active: False
+    check:
+     - type: AskListener
+       question: Completely close the telescope?
+       waittime: 120
+    responses:
+      - type: TelescopeAction
+        mode: 3
+      - type: DomeAction
+        mode: 1
+      - type: StopAll
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanEast
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanWest
+      - type: TelescopeAction
+        mode: 9
+        parameter: /SchneiderOTBFan/M1
+      - type: DomeAction
+        mode: 4
+        parameter: 90
+
+  - name: ParkTelescope
+    eager: False
+    active: False
+    check:
+     - type: AskListener
+       question: Park telescope?
+       waittime: 120
+    responses:
+      - type: StopAll
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanEast
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanWest
+      - type: TelescopeAction
+        mode: 9
+        parameter: /SchneiderOTBFan/M1
+      - type: TelescopeAction
+        mode: 3
+      - type: DomeAction
+        mode: 1
+      - type: DomeAction
+        mode: 4
+        parameter: 90
+      - type: TelescopeAction
+        mode: 1

@@ -1,0 +1,19 @@
+checklist:
+
+  - name: CoolDome
+    eager: False
+    eager_response: False
+    comment: If dome temperature is too high, start fans
+    check:
+      - type: CheckInstrumentFlag
+        instrument: dome
+        flag: sunup
+        mode: 2
+      # TODO: check delta_T and not locked humidity, dew
+    responses:
+      - type: DomeAction
+        mode: 5
+        parameter: /CSKFan/DomeFanEast,200
+      - type: DomeAction
+        mode: 5
+        parameter: /CSKFan/DomeFanWest,200

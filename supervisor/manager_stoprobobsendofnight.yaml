@@ -1,0 +1,22 @@
+checklist:
+
+  - name: StopRobObsEnd
+    eager: False
+    eager_response: False
+    comment: Stops robobs at the end of the night
+    check:
+      - type: CheckTime
+        mode: 5
+        deltaTime: -0.05
+      - type: CheckTime
+        mode: -5
+        deltaTime: 0.45
+      - type: CheckDome
+        mode: 0
+      - type: CheckInstrumentFlag
+        instrument: scheduler
+        flag: OPERATING
+        mode: 0 
+    responses:
+      - type: StopRobObs
+

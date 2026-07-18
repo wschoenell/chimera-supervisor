@@ -1,0 +1,147 @@
+# Daily open/close cycle, adapted from the T80S production checklists for
+# the fake-hardware soak test (see ../MIGRATION.md).
+checklist:
+  unlock_sunup_at_dusk:
+    # ADDED (not in T80S): the morning close locks the dome with key
+    # "sunup" and at T80S an operator released it; here we release it
+    # automatically before the evening open window so the cycle is
+    # autonomous.
+    description: Release the morning sunup lock before the evening open
+    conditions:
+      - condition: time
+        after: sunset
+        offset: -3h
+      - condition: time
+        before: sunset
+        offset: -2h
+      - condition: flag
+        instrument: dome
+        locked_with_key: sunup
+    responses:
+      - action: unlock
+        instrument: dome
+        key: sunup
+
+  open_dome_at_sunset:
+    # from manager_openatsunset.yaml OpenDomeAtSunset (fans/lamp -> fakes,
+    # webcam -> public URL, unregistered SkyFlat flag dropped)
+    description: Open dome at sunset and start fans
+    run: always
+    on_error: abort
+    conditions:
+      - condition: time
+        after: sunset
+        offset: -2h
+      - condition: dome
+        slit: closed
+      - condition: flag
+        instrument: site
+        is: ready
+      - condition: flag
+        instrument: dome
+        is_not: lock
+    responses:
+      - action: set_flag
+        instrument: site
+        flag: ready
+      - action: set_flag
+        instrument: scheduler
+        flag: ready
+      - action: telescope
+        do: unpark
+      - action: set_flag
+        instrument: dome
+        flag: ready
+      - action: dome
+        do: open_slit
+      - action: dome
+        do: track
+      - action: fan
+        do: switch_on
+        fan: /FakeFan/fake
+        speed: 600
+      - action: lamp
+        do: switch_off
+        lamp: /FakeLamp/fake
+      - action: dome
+        do: slew
+        azimuth: oppose_sun
+      - action: telescope
+        do: open_cover
+      - action: send_photo
+        url: https://picsum.photos/320/240
+        message: dome open for the night
+
+  open_dome_flap_at_night_start:
+    # from manager_opendomeflapatnightstart.yaml (lamp-off script and
+    # robobs start dropped)
+    description: Open flap and cover, stop fans for the night
+    on_error: abort
+    conditions:
+      - condition: time
+        after: sunset_twilight_end
+        offset: -30m
+      - condition: time
+        before: sunset_twilight_end
+      - condition: dome
+        slit: open
+    responses:
+      - action: dome
+        do: open_flap
+      - action: dome
+        do: track
+      - action: fan
+        do: switch_off
+        fan: /FakeFan/fake
+      - action: telescope
+        do: open_cover
+
+  close_at_sunrise:
+    # from manager_closeatsunrise.yaml LockDomeOnSunrise (fans -> fake,
+    # bias queue -> chimera sample queue, webcams -> one public URL)
+    description: Stop, close, park and lock the dome at sunrise; run the morning queue
+    conditions:
+      - condition: time
+        after: sunrise
+        offset: 6m
+    responses:
+      - action: stop_all
+      - action: fan
+        do: switch_on
+        fan: /FakeFan/fake
+        speed: 300
+      - action: telescope
+        do: close_cover
+      - action: dome
+        do: close_slit
+      - action: dome
+        do: slew
+        azimuth: 90
+      - action: telescope
+        do: park
+      - action: lock
+        instrument: dome
+        key: sunup
+      # bias-only queue: the telescope is parked here, so no pointing
+      # (T80S loaded a bias queue at sunrise for the same reason)
+      - action: configure_scheduler
+        file: /home/william/chimera/checklist/queues/bias.yaml
+      - action: scheduler
+        do: start
+      - action: send_photo
+        url: https://picsum.photos/320/240
+        message: closed at sunrise
+
+  check_telescope_parked:
+    # from manager_checktelescopeparked.yaml / manager_checkws.yaml
+    description: Telescope parked but flag not close -> fix the flag
+    conditions:
+      - condition: telescope
+        state: parked
+      - condition: flag
+        instrument: telescope
+        is_not: close
+    responses:
+      - action: set_flag
+        instrument: telescope
+        flag: close

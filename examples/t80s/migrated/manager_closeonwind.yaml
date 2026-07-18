@@ -1,0 +1,45 @@
+checklist:
+  CloseOnWind:
+    description: Stop all instruments, close telescope and dome if wind is higher
+      than threshold
+    conditions:
+    - condition: wind_speed
+      above: 16.0
+    - condition: dome
+      slit: open
+    responses:
+    - action: stop_all
+    - action: fan
+      do: switch_off
+      fan: /CSKFan/DomeFanWest
+    - action: fan
+      do: switch_off
+      fan: /SchneiderOTBFan/M1
+    - action: telescope
+      do: close_cover
+    - action: fan
+      do: switch_off
+      fan: ''
+    - action: dome
+      do: close_slit
+    - action: dome
+      do: slew
+      azimuth: 90.0
+    - action: lock
+      instrument: dome
+      key: wind
+  DailightOnWind:
+    description: Stop all instruments, close telescope and dome if wind is higher
+      than threshold
+    conditions:
+    - condition: flag
+      instrument: dome
+      not_locked_with_key: wind
+    - condition: wind_speed
+      above: 16.0
+    - condition: dome
+      slit: closed
+    responses:
+    - action: lock
+      instrument: dome
+      key: wind

@@ -1,0 +1,41 @@
+checklist:
+  LockDomeOnSunrise:
+    description: Stop all instruments, close telescope and dome, and lock dome at
+      sunrise.
+    conditions:
+    - condition: time
+      after: sunrise
+      offset: 6m
+    responses:
+    - action: stop_all
+    - action: fan
+      do: switch_on
+      fan: /CSKFan/DomeFanEast
+      speed: 300.0
+    - action: fan
+      do: switch_on
+      fan: /CSKFan/DomeFanWest
+      speed: 300.0
+    - action: fan
+      do: switch_off
+      fan: /SchneiderOTBFan/M1
+    - action: telescope
+      do: close_cover
+    - action: dome
+      do: close_slit
+    - action: dome
+      do: slew
+      azimuth: 90.0
+    - action: telescope
+      do: park
+    - action: lock
+      instrument: dome
+      key: sunup
+    - action: configure_scheduler
+      file: /mnt/public/t80s_scripts/scheduler/bias.yaml
+    - action: scheduler
+      do: start
+    - action: send_photo
+      url: http://192.168.20.102/axis-cgi/jpg/image.cgi?resolution=320x240
+    - action: send_photo
+      url: http://192.168.20.104/axis-cgi/jpg/image.cgi?resolution=352x240

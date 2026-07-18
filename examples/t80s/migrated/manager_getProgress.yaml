@@ -1,0 +1,12 @@
+checklist:
+  GetObsProgress:
+    active: false
+    conditions:
+    - condition: ask_operator
+      question: Send AllSky Image?
+      timeout: 2m
+    responses:
+    - action: run_script
+      path: /mnt/public/t80s_scripts/scripts/obs_progress.sh
+    - action: send_photo
+      url: /home/chimera/robobs-work/foo.png

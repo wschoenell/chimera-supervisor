@@ -1,0 +1,18 @@
+checklist:
+  - name: GetInternalImages
+    eager: False
+    active: False
+    check:
+     - type: AskListener
+       question: Send AllSky Image? 
+       waittime: 120
+    responses:
+#      - type: SendPhoto
+#        path: http://192.168.20.102/axis-cgi/jpg/image.cgi?resolution=800x600
+      - type: SendPhoto
+        path: http://192.168.20.102/axis-cgi/jpg/image.cgi?resolution=320x240
+      - type: SendPhoto
+        path: http://192.168.20.104/axis-cgi/jpg/image.cgi?resolution=352x240
+#      - type: SendPhoto
+#        path: http://192.168.20.104/axis-cgi/jpg/image.cgi?resolution=704x480
+

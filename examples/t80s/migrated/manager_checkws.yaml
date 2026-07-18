@@ -1,0 +1,108 @@
+checklist:
+  CheckWS01_OK:
+    conditions:
+    - condition: weather_station
+      station: 2
+      state: ok
+    - condition: flag
+      instrument: weatherstations_01
+      is_not: ready
+    responses:
+    - action: set_flag
+      instrument: weatherstations_01
+      flag: ready
+  CheckWS02_NOTOK:
+    conditions:
+    - condition: weather_station
+      station: 2
+      state: stale
+    - condition: flag
+      instrument: weatherstations_02
+      is_not: close
+    responses:
+    - action: set_flag
+      instrument: weatherstations_02
+      flag: close
+  CheckWS03_OK:
+    conditions:
+    - condition: weather_station
+      station: 2
+      state: ok
+    - condition: flag
+      instrument: weatherstations_03
+      is_not: ready
+    responses:
+    - action: set_flag
+      instrument: weatherstations_03
+      flag: ready
+  CheckWS03_NOTOK:
+    conditions:
+    - condition: weather_station
+      station: 2
+      state: stale
+    - condition: flag
+      instrument: weatherstations_03
+      is_not: close
+    responses:
+    - action: set_flag
+      instrument: weatherstations_03
+      flag: close
+  CheckWS03_OK_2:
+    conditions:
+    - condition: weather_station
+      station: 2
+      state: ok
+    - condition: flag
+      instrument: weatherstations_03
+      is_not: ready
+    responses:
+    - action: set_flag
+      instrument: weatherstations_03
+      flag: ready
+  CheckWS01_NOTOK:
+    conditions:
+    - condition: weather_station
+      station: 2
+      state: stale
+    - condition: flag
+      instrument: weatherstations_01
+      is_not: close
+    responses:
+    - action: set_flag
+      instrument: weatherstations_01
+      flag: close
+  CheckWS02_NOTOK_2:
+    conditions:
+    - condition: weather_station
+      station: 2
+      state: stale
+    - condition: flag
+      instrument: weatherstations_02
+      is_not: close
+    responses:
+    - action: set_flag
+      instrument: weatherstations_02
+      flag: close
+  CheckWS03_NOTOK_2:
+    conditions:
+    - condition: weather_station
+      station: 2
+      state: stale
+    - condition: flag
+      instrument: weatherstations_03
+      is_not: close
+    responses:
+    - action: set_flag
+      instrument: weatherstations_03
+      flag: close
+  CheckTelescopeParked:
+    conditions:
+    - condition: telescope
+      state: parked
+    - condition: flag
+      instrument: telescope
+      is_not: close
+    responses:
+    - action: set_flag
+      instrument: telescope
+      flag: close

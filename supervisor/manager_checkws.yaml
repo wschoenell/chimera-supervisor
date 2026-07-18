@@ -1,0 +1,140 @@
+checklist:
+  - name: CheckWS01_OK
+    eager: False
+    active: True
+    check:
+      - type: CheckWeatherStation
+        index: 2
+      - type: CheckInstrumentFlag
+        instrument: weatherstations_01
+        mode: 1
+        flag: READY
+    responses:
+      - type: SetInstrumentFlag
+        instrument: weatherstations_01
+        flag: 1
+
+  - name: CheckWS02_NOTOK
+    eager: False
+    active: True
+    check:
+      - type: CheckWeatherStation
+        index: 2
+        mode: 1
+      - type: CheckInstrumentFlag
+        instrument: weatherstations_02
+        mode: 1
+        flag: CLOSE
+    responses:
+      - type: SetInstrumentFlag
+        instrument: weatherstations_02
+        flag: 3
+
+  - name: CheckWS03_OK
+    eager: False
+    active: True
+    check:
+      - type: CheckWeatherStation
+        index: 2
+      - type: CheckInstrumentFlag
+        instrument: weatherstations_03
+        mode: 1
+        flag: READY
+    responses:
+      - type: SetInstrumentFlag
+        instrument: weatherstations_03
+        flag: 1
+
+  - name: CheckWS03_NOTOK
+    eager: False
+    active: True
+    check:
+      - type: CheckWeatherStation
+        index: 2
+        mode: 1
+      - type: CheckInstrumentFlag
+        instrument: weatherstations_03
+        mode: 1
+        flag: CLOSE
+    responses:
+      - type: SetInstrumentFlag
+        instrument: weatherstations_03
+        flag: 3
+
+  - name: CheckWS03_OK
+    eager: False
+    active: True
+    check:
+      - type: CheckWeatherStation
+        index: 2
+      - type: CheckInstrumentFlag
+        instrument: weatherstations_03
+        mode: 1
+        flag: READY
+    responses:
+      - type: SetInstrumentFlag
+        instrument: weatherstations_03
+        flag: 1
+
+  - name: CheckWS01_NOTOK
+    eager: False
+    active: True
+    check:
+      - type: CheckWeatherStation
+        index: 2
+        mode: 1
+      - type: CheckInstrumentFlag
+        instrument: weatherstations_01
+        mode: 1
+        flag: CLOSE
+    responses:
+      - type: SetInstrumentFlag
+        instrument: weatherstations_01
+        flag: 3
+
+  - name: CheckWS02_NOTOK
+    eager: False
+    active: True
+    check:
+      - type: CheckWeatherStation
+        index: 2
+        mode: 1
+      - type: CheckInstrumentFlag
+        instrument: weatherstations_02
+        mode: 1
+        flag: CLOSE
+    responses:
+      - type: SetInstrumentFlag
+        instrument: weatherstations_02
+        flag: 3
+
+
+  - name: CheckWS03_NOTOK
+    eager: False
+    active: True
+    check:
+      - type: CheckWeatherStation
+        index: 2
+        mode: 1
+      - type: CheckInstrumentFlag
+        instrument: weatherstations_03
+        mode: 1
+        flag: CLOSE
+    responses:
+      - type: SetInstrumentFlag
+        instrument: weatherstations_03
+        flag: 3
+
+  - name: CheckTelescopeParked
+    eager: False
+    check:
+      - type: CheckTelescope
+        mode: 1
+      - type: CheckInstrumentFlag
+        instrument: telescope
+        mode: 1
+        flag: CLOSE
+    responses:
+      - type: SetInstrumentFlag
+        instrument: telescope
+        flag: 3

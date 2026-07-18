@@ -1,0 +1,13 @@
+checklist:
+  UnlockDew:
+    description: Unlock dome in case humidity is lower than a threshold for a specific
+      period of time
+    run: always
+    conditions:
+    - condition: dew_gap
+      above: 5.0
+      for: 30m
+    responses:
+    - action: unlock
+      instrument: dome
+      key: dew

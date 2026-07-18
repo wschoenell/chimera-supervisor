@@ -1,0 +1,21 @@
+checklist:
+  - name: MakeQueue
+    eager: False
+    eager_response: False
+    active: True
+    comment: Prepare observing queue for the night by running a shell script.
+    check:
+      - type: CheckTime
+        mode: 4
+        deltaTime: 0.5
+    responses:
+      - type: ExecuteScript
+        filename: /mnt/public/t80s_scripts/scripts/plan_robobs.sh
+      - type: SendTelegram
+        message: Last night observations
+      - type: SendPhoto
+        path: /home/chimera/robobs-work/foo2.png
+      - type: SendTelegram
+        message: Tonight observations plan
+      - type: SendPhoto
+        path: /home/chimera/robobs-work/foo.png

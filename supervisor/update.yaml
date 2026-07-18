@@ -1,0 +1,174 @@
+checklist:
+  - name: OpenAndStartRoboObs
+    eager: False
+    eager_response: False
+    active: False
+    comment: Open dome and telescope and start robobs
+    check:
+      - type: AskListener
+        question: Open telescope and start RoboObs?
+        waittime: 120
+    responses:
+      - type: SetInstrumentFlag
+        instrument: site
+        flag: 1
+      - type: SetInstrumentFlag
+        instrument: scheduler
+        flag: 1
+      - type: TelescopeAction
+        mode: 0
+      - type: DomeAction
+        mode: 0
+      - type: DomeAction
+        mode: 9
+      - type: DomeAction
+        mode: 8
+        parameter: /SchneiderOTBLamp/building
+      - type: DomeAction
+        mode: 2
+      - type: TelescopeAction
+        mode: 2
+      - type: ExecuteScript
+        filename: /mnt/public/t80s_scripts/scripts/switch_lamp_off.sh
+      - type: StartRobObs
+
+  - name: OpenDomeFlapAtNightStart
+    eager: False
+    eager_response: False
+    comment: Prepare telescope for night start.
+    check:
+      - type: CheckTime
+        mode: 3
+        deltaTime: -0.5
+      - type: CheckTime
+        mode: -3
+        deltaTime: 0.0
+      - type: CheckDome
+        mode: 0
+#      - type: CheckDome
+#        mode: 3
+#      - type: AskListener
+#        question: Night starting! Open dome flap, telescope cover and switch off fans?
+#        waittime: 120
+    responses:
+      - type: DomeAction
+        mode: 2
+      - type: DomeAction
+        mode: 9
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanEast
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanWest
+      - type: TelescopeAction
+        mode: 2
+      - type: TelescopeAction
+        mode: 9
+        parameter: /SchneiderOTBFan/M1
+      - type: ExecuteScript
+        filename: /mnt/public/t80s_scripts/scripts/switch_lamp_off.sh
+      - type: StartRobObs
+
+  - name: TakeSkyFlats
+    eager: False
+    eager_response: False
+    comment: Make sky flats at the beginning of the night.
+    check:
+      - type: CheckTime
+        mode: 1
+        deltaTime: -0.15
+      - type: CheckTime
+        mode: -1
+        deltaTime: +0.2
+      - type: CheckDome
+        mode: 0
+      - type: CheckInstrumentFlag
+        instrument: scheduler
+        flag: OPERATING
+        mode: 1
+      - type: AskListener
+        question: Ready to start sky flats at start of the night. Ok to proceed?
+        waittime: 120
+    responses:
+      - type: TelescopeAction
+        mode: 2
+      - type: ExecuteScript
+        filename: /mnt/public/t80s_scripts/scripts/switch_lamp_off.sh
+      - type: ConfigureScheduler
+        filename: "/mnt/public/skyflats/skyflat.yaml"
+      - type: StartScheduler
+      
+  - name: ParkTelescope
+    eager: False
+    active: False
+    check:
+     - type: AskListener
+       question: Park telescope?
+       waittime: 120
+    responses:
+      - type: StopAll
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanEast
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanWest
+      - type: TelescopeAction
+        mode: 9
+        parameter: /SchneiderOTBFan/M1
+      - type: TelescopeAction
+        mode: 3
+      - type: DomeAction
+        mode: 1
+      - type: DomeAction
+        mode: 4
+        parameter: 90
+      - type: TelescopeAction
+        mode: 1
+
+  - name: OperatorLock
+    eager: False
+    active: False
+    check:
+     - type: AskListener
+       question: Lock telescope?
+       waittime: 120
+    responses:
+      - type: StopAll
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanEast
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanWest
+      - type: TelescopeAction
+        mode: 9
+        parameter: /SchneiderOTBFan/M1
+      - type: TelescopeAction
+        mode: 3
+      - type: DomeAction
+        mode: 1
+      - type: DomeAction
+        mode: 4
+        parameter: 90
+      - type: LockInstrument
+        instrument: dome
+        key: operator
+
+  - name: OperatorUnLock
+    eager: False
+    eager_response: False
+    active: False
+    comment: Unlock dome and site by operator.
+    check:
+    - type: AskListener
+      question: Unlock site and dome?
+      waittime: 120
+    responses:
+      - type: UnlockInstrument
+        instrument: dome
+        key: operator
+      - type: SetInstrumentFlag
+        instrument: dome
+        flag: 1

@@ -1,0 +1,16 @@
+checklist:
+
+  - name: SendPhotoOnSkyFlat
+    eager: False
+    eager_response: False
+    comment: Send image before skyflat.
+    check:
+      - type: CheckTime
+        mode: 1
+        deltaTime: -0.20
+      - type: CheckTime
+        mode: -1
+        deltaTime: +0.20
+    responses:
+      - type: SendPhoto
+        path: /mnt/public/allsky/AllSkyCurrentImage.JPG

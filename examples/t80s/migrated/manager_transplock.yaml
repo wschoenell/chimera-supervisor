@@ -1,0 +1,42 @@
+checklist:
+  DailightTransparencyLock:
+    conditions:
+    - condition: transparency
+      below: 35.0
+    - condition: dome
+      slit: closed
+    - condition: flag
+      instrument: site
+      not_locked_with_key: transparency
+    responses:
+    - action: lock
+      instrument: site
+      key: transparency
+    - action: send_photo
+      url: /mnt/public/allsky/AllSkyCurrentImage.JPG
+  TransparencyLock:
+    conditions:
+    - condition: transparency
+      below: 35.0
+    - condition: dome
+      slit: open
+    - condition: flag
+      instrument: dome
+      not_locked_with_key: transparency
+    responses:
+    - action: fan
+      do: switch_off
+      fan: /CSKFan/DomeFanEast
+    - action: fan
+      do: switch_off
+      fan: /CSKFan/DomeFanWest
+    - action: stop_all
+    - action: telescope
+      do: close_cover
+    - action: dome
+      do: close_slit
+    - action: lock
+      instrument: site
+      key: transparency
+    - action: send_photo
+      url: /mnt/public/allsky/AllSkyCurrentImage.JPG

@@ -1,0 +1,14 @@
+checklist:
+  SendPhotoOnSkyFlat:
+    description: Send image before skyflat.
+    on_error: abort
+    conditions:
+    - condition: time
+      after: sunset
+      offset: -12m
+    - condition: time
+      before: sunset
+      offset: 12m
+    responses:
+    - action: send_photo
+      url: /mnt/public/allsky/AllSkyCurrentImage.JPG

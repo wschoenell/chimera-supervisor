@@ -1,0 +1,29 @@
+checklist:
+
+  - name: TestAction
+    eager: False
+    active: False
+    check:
+#     - type: CheckTelescope
+#       mode: -5
+     - type: AskListener
+       question: Test action?
+       waittime: 120
+    responses:
+#      - type: ExecuteScript
+#        filename: /home/chimera/.chimera/m2law_stop.sh
+#      - type: DomeAction
+#        mode: 7
+#        parameter: /SchneiderOTBLamp/building
+#      - type: StartRobObs
+#      - type: StopRobObs
+#      - type: SendTelegram
+#        message: Power Off! 
+#      - type: DomeAction
+#        mode: 4
+#        parameter: oppose-sun
+#      - type: SendTelegram
+#        message: M1 temperature bellow FrontRing temperature
+     - type: TelescopeAction
+       mode: 9
+       parameter: /SchneiderOTBFan/M1

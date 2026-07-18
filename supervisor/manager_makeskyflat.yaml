@@ -1,0 +1,66 @@
+checklist:
+
+  - name: TakeSkyFlats
+    eager: False
+    eager_response: False
+    comment: Make sky flats at the beginning of the night.
+    check:
+      - type: CheckTime
+        mode: 1
+        deltaTime: -0.15
+      - type: CheckTime
+        mode: -1
+        deltaTime: +0.2
+      - type: CheckDome
+        mode: 0
+      - type: CheckInstrumentFlag
+        instrument: scheduler
+        flag: OPERATING
+        mode: 1
+      - type: CheckInstrumentFlag
+        instrument: SkyFlat
+        flag: READY
+        mode: 0
+#      - type: AskListener
+#        question: Ready to start sky flats at start of the night. Ok to proceed?
+#        waittime: 120
+    responses:
+      - type: SetInstrumentFlag
+        instrument: SkyFlat
+        flag: 2
+      - type: TelescopeAction
+        mode: 2
+      - type: ExecuteScript
+        filename: /mnt/public/t80s_scripts/scripts/switch_lamp_off.sh
+      - type: ConfigureScheduler
+        filename: "/mnt/public/skyflats/skyflat.yaml"
+      - type: StartScheduler
+
+
+#  - name: TakeSkyFlatsEnd
+#    eager: False
+#    eager_response: False
+#    comment: Make sky flats at the end of the night.
+#    check:
+#      - type: CheckTime
+#        mode: 5
+#        deltaTime: 0.8
+#      - type: CheckTime
+#        mode: -5
+#        deltaTime: 1.0
+#      - type: CheckDome
+#        mode: 0
+#      - type: CheckInstrumentFlag
+#        instrument: scheduler
+#        flag: OPERATING
+#        mode: 1
+##      - type: AskListener
+##        question: Ready to start sky flats at the end of the night. Ok to proceed?
+##        waittime: 120
+#    responses:
+#      - type: StopRobObs
+#      - type: DomeAction
+#        mode: 3
+#      - type: ConfigureScheduler
+#        filename: "/mnt/public/skyflats/skyflat.yaml"
+#      - type: StartScheduler

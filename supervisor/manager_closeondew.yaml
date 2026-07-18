@@ -1,0 +1,46 @@
+checklist:
+  - name: CloseOnDew
+    eager: False
+    active: True
+    comment: Stop all instruments, close telescope and dome if temperature is closer than threshold from dew point
+    check:
+      - type: CheckDome
+        mode: 0
+      - type: CheckDew
+        tempdiff: 4
+    responses:
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanEast
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanWest
+      - type: TelescopeAction
+        mode: 9
+        parameter: /SchneiderOTBFan/M1
+      - type: StopAll
+      - type: TelescopeAction
+        mode: 3
+      - type: DomeAction
+        mode: 1
+      - type: LockInstrument
+        instrument: dome
+        key: dew
+
+  - name: DailightCloseOnDew
+    eager: False
+    active: True
+    comment: Stop all instruments, close telescope and dome if temperature is closer than threshold from dew point
+    check:
+      - type: CheckInstrumentFlag
+        instrument: dome
+        flag: dew
+        mode: 3
+      - type: CheckDew
+        tempdiff: 4
+      - type: CheckDome
+        mode: 1
+    responses:
+      - type: LockInstrument
+        instrument: dome
+        key: dew

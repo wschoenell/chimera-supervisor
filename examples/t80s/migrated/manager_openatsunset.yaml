@@ -1,0 +1,66 @@
+checklist:
+  OpenDomeAtSunset:
+    description: Open dome at sunset and start fans
+    run: always
+    on_error: abort
+    conditions:
+    - condition: time
+      after: sunset
+      offset: -2h
+    - condition: dome
+      slit: closed
+    - condition: flag
+      instrument: site
+      is: ready
+    - condition: flag
+      instrument: dome
+      is_not: lock
+    responses:
+    - action: set_flag
+      instrument: site
+      flag: ready
+    - action: set_flag
+      instrument: scheduler
+      flag: ready
+    - action: set_flag
+      instrument: SkyFlat
+      flag: ready
+    - action: telescope
+      do: unpark
+    - action: set_flag
+      instrument: dome
+      flag: ready
+    - action: dome
+      do: open_slit
+    - action: dome
+      do: track
+    - action: fan
+      do: switch_on
+      fan: /CSKFan/DomeFanEast
+      speed: 600.0
+    - action: fan
+      do: switch_on
+      fan: /CSKFan/DomeFanWest
+      speed: 600.0
+    - action: lamp
+      do: switch_off
+      lamp: /SchneiderOTBLamp/building
+    - action: dome
+      do: slew
+      azimuth: oppose_sun
+    - action: telescope
+      do: open_cover
+    - action: send_photo
+      url: http://192.168.20.114/image.jpg
+  OpposeSun:
+    description: Oppose dome to the Sun
+    active: false
+    on_error: abort
+    conditions:
+    - condition: ask_operator
+      question: Ready to open dome and start fans. Should I proceed?
+      timeout: 2m
+    responses:
+    - action: dome
+      do: slew
+      azimuth: oppose_sun

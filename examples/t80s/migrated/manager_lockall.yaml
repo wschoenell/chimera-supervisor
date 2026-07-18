@@ -1,0 +1,110 @@
+checklist:
+  CloseOnHumidity:
+    description: Stop all instruments, close telescope and dome if humidity is higher
+      than threshold
+    conditions:
+    - condition: humidity
+      above: 85.0
+    - condition: flag
+      instrument: dome
+      not_locked_with_key: humidity
+    responses:
+    - action: fan
+      do: switch_off
+      fan: /CSKFan/DomeFanEast
+    - action: fan
+      do: switch_off
+      fan: /CSKFan/DomeFanWest
+    - action: fan
+      do: switch_off
+      fan: /SchneiderOTBFan/M1
+    - action: stop_all
+    - action: telescope
+      do: close_cover
+    - action: dome
+      do: close_slit
+    - action: lock
+      instrument: dome
+      key: humidity
+  CloseOnDew:
+    description: Stop all instruments, close telescope and dome if temperature is
+      closer than threshold from dew point
+    conditions:
+    - condition: dew_gap
+      below: 4.0
+    - condition: flag
+      instrument: dome
+      not_locked_with_key: dew
+    responses:
+    - action: fan
+      do: switch_off
+      fan: /CSKFan/DomeFanEast
+    - action: fan
+      do: switch_off
+      fan: /CSKFan/DomeFanWest
+    - action: fan
+      do: switch_off
+      fan: /SchneiderOTBFan/M1
+    - action: stop_all
+    - action: telescope
+      do: close_cover
+    - action: dome
+      do: close_slit
+    - action: lock
+      instrument: dome
+      key: dew
+  CloseOnWind:
+    description: Stop all instruments, close telescope and dome if wind is higher
+      than threshold
+    conditions:
+    - condition: wind_speed
+      above: 16.0
+    - condition: flag
+      instrument: dome
+      not_locked_with_key: wind
+    responses:
+    - action: fan
+      do: switch_off
+      fan: /CSKFan/DomeFanEast
+    - action: fan
+      do: switch_off
+      fan: /CSKFan/DomeFanWest
+    - action: fan
+      do: switch_off
+      fan: /SchneiderOTBFan/M1
+    - action: stop_all
+    - action: telescope
+      do: close_cover
+    - action: dome
+      do: close_slit
+    - action: lock
+      instrument: dome
+      key: wind
+  TransparencyLock:
+    active: false
+    conditions:
+    - condition: transparency
+      below: 32.0
+    - condition: dome
+      slit: open
+    - condition: flag
+      instrument: dome
+      not_locked_with_key: transparency
+    responses:
+    - action: fan
+      do: switch_off
+      fan: /CSKFan/DomeFanEast
+    - action: fan
+      do: switch_off
+      fan: /CSKFan/DomeFanWest
+    - action: fan
+      do: switch_off
+      fan: /SchneiderOTBFan/M1
+    - action: stop_all
+    - action: telescope
+      do: close_cover
+    - action: dome
+      do: close_slit
+    - action: lock
+      instrument: site
+      key: transparency

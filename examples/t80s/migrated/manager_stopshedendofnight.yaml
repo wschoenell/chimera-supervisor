@@ -1,0 +1,42 @@
+checklist:
+  StopSchedEnd:
+    description: Make sky flats at the end of the night.
+    on_error: abort
+    conditions:
+    - condition: time
+      after: sunrise_twilight_begin
+      offset: 1188s
+    - condition: time
+      before: sunrise_twilight_begin
+      offset: 36m
+    - condition: dome
+      slit: open
+    - condition: flag
+      instrument: scheduler
+      is: operating
+    responses:
+    - action: stop_all
+  TakeSkyFlatsEnd:
+    description: Make sky flats at the end of the night.
+    on_error: abort
+    conditions:
+    - condition: time
+      after: sunrise_twilight_begin
+      offset: 39m
+    - condition: time
+      before: sunrise_twilight_begin
+      offset: 48m
+    - condition: dome
+      slit: open
+    - condition: flag
+      instrument: scheduler
+      is_not: operating
+    responses:
+    - action: robobs
+      do: stop
+    - action: dome
+      do: close_flap
+    - action: configure_scheduler
+      file: /mnt/public/skyflats/skyflat.yaml
+    - action: scheduler
+      do: start

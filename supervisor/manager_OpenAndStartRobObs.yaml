@@ -1,0 +1,33 @@
+checklist:
+  - name: OpenAndStartRoboObs
+    eager: False
+    eager_response: False
+    active: False
+    comment: Open dome and telescope and start robobs
+    check:
+      - type: AskListener
+        question: Open telescope and start RoboObs?
+        waittime: 120
+    responses:
+      - type: SetInstrumentFlag
+        instrument: site
+        flag: 1
+      - type: SetInstrumentFlag
+        instrument: scheduler
+        flag: 1
+      - type: TelescopeAction
+        mode: 0
+      - type: DomeAction
+        mode: 0
+      - type: DomeAction
+        mode: 8
+        parameter: /SchneiderOTBLamp/building
+      - type: DomeAction
+        mode: 2
+      - type: TelescopeAction
+        mode: 2
+      - type: ExecuteScript
+        filename: /mnt/public/t80s_scripts/scripts/switch_lamp_off.sh
+      - type: StartRobObs
+      - type: DomeAction
+        mode: 9

@@ -1,0 +1,17 @@
+checklist:
+  CoolDome:
+    description: If dome temperature is too high, start fans
+    on_error: abort
+    conditions:
+    - condition: flag
+      instrument: dome
+      locked_with_key: sunup
+    responses:
+    - action: fan
+      do: switch_on
+      fan: /CSKFan/DomeFanEast
+      speed: 200.0
+    - action: fan
+      do: switch_on
+      fan: /CSKFan/DomeFanWest
+      speed: 200.0

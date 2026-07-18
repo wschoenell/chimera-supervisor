@@ -1,0 +1,10 @@
+checklist:
+  PowerOff:
+    active: false
+    conditions:
+    - condition: ask_operator
+      question: Test action?
+      timeout: 2m
+    responses:
+    - action: notify
+      message: WARNING! Power cut detected on T80! Please check instruments.

@@ -1,0 +1,11 @@
+checklist:
+  SchedulerInError:
+    description: Run when there is an error with the scheduler
+    active: false
+    on_error: abort
+    conditions:
+    - condition: ask_operator
+      question: Stop Scheduler?
+      timeout: 2m
+    responses:
+    - action: stop_all

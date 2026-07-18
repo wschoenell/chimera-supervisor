@@ -1,0 +1,10 @@
+checklist:
+  GetAllSky:
+    active: false
+    conditions:
+    - condition: ask_operator
+      question: Send AllSky Image?
+      timeout: 2m
+    responses:
+    - action: send_photo
+      url: /mnt/public/allsky/AllSkyCurrentImage.JPG

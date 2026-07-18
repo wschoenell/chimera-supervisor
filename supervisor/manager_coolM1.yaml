@@ -1,0 +1,26 @@
+checklist:
+
+  - name: CoolM1
+    eager: False
+    eager_response: False
+    comment: If dome is open and M1 temperature is higher than FrontRing, switch on M1 fan
+    check:
+      - type: CheckDome
+        mode: 0
+      - type: CheckInstrumentFlag
+        instrument: site
+        mode: 0
+        flag: READY
+      - type: CheckInstrumentFlag
+        instrument: dome
+        mode: 1
+        flag: LOCK
+      - type: CheckTelescope
+        mode: 5
+      - type: CheckTime
+        mode: -3
+        deltaTime: -0.5
+    responses:
+     - type: TelescopeAction
+       mode: 8
+       parameter: /SchneiderOTBFan/M1

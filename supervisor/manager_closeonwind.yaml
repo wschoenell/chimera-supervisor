@@ -1,0 +1,54 @@
+checklist:
+
+  - name: CloseOnWind
+    eager: False
+    comment: Stop all instruments, close telescope and dome if wind is higher than threshold
+    check:
+      - type: CheckWindSpeed
+        windspeed: 16.0
+      - type: CheckDome
+        mode: 0
+#      - type: CheckInstrumentFlag
+#        instrument: dome
+#        flag: wind
+#        mode: 3
+    responses:
+ #     - type: ExecuteScript
+ #       filename: /home/chimera/.chimera/m2law_stop.sh
+      - type: StopAll
+        parameter: /CSKFan/DomeFanEast
+      - type: DomeAction
+        mode: 6
+        parameter: /CSKFan/DomeFanWest
+      - type: TelescopeAction
+        mode: 9
+        parameter: /SchneiderOTBFan/M1
+      - type: TelescopeAction
+        mode: 3
+      - type: DomeAction
+        mode: 6
+      - type: DomeAction
+        mode: 1
+      - type: DomeAction
+        mode: 4
+        parameter: 90
+      - type: LockInstrument
+        instrument: dome
+        key: wind
+
+  - name: DailightOnWind
+    eager: False
+    comment: Stop all instruments, close telescope and dome if wind is higher than threshold
+    check:
+      - type: CheckInstrumentFlag
+        instrument: dome
+        flag: wind
+        mode: 3
+      - type: CheckWindSpeed
+        windspeed: 16.0
+      - type: CheckDome
+        mode: 1
+    responses:
+      - type: LockInstrument
+        instrument: dome
+        key: wind

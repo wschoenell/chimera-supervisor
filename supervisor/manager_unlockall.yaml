@@ -1,0 +1,93 @@
+checklist:
+#  - name: UnlockDomeOnSunset
+#    eager: True
+#    comment: Unlock dome on sunset. Will not open it. Just unlock.
+#    check:
+#      - type: CheckTime
+#        mode: 1
+#        deltaTime: -2.25
+#      - type: CheckInstrumentFlag
+#        instrument: dome
+#        flag: sunup
+#        mode: 2
+#    responses:
+#      - type: UnLockInstrument
+#        instrument: dome
+#        key: sunup
+#      #- type: UnparkTelescope
+#  - name: TestTransparencyUnLock
+#    eager: False
+#    check: 
+#      - type: CheckTransparency
+#        transparency: 40
+#        mode: 1
+#        deltaTime: 0.25
+#      - type: CheckInstrumentFlag
+#        instrument: site
+#        flag: transparency
+#        mode: 2
+#    responses:
+##      - type: SendTelegram
+##        message: Transparency OK!
+#      - type: UnLockInstrument
+#        instrument: site
+#        key: transparency
+#      - type: SetInstrumentFlag
+#        instrument: site
+#        flag: 1
+#      - type: SendPhoto
+#        path: /mnt/public/allsky/AllSkyCurrentImage.JPG
+  - name: UnlockDew
+    eager: True
+    comment: Unlock dome in case humidity is lower than a threshold for a specific period of time
+    check:
+      - type: CheckDew
+        tempdiff: 5
+        deltaTime: 0.5
+        mode: 1
+      - type: CheckInstrumentFlag
+        instrument: dome
+        flag: dew
+        mode: 2
+    responses:
+      - type: UnlockInstrument
+        instrument: dome
+        key: dew
+#
+#  - name: UnlockHumidity
+#    eager: True
+#    comment: Unlock dome in case humidity is lower than a threshold for a specific period of time
+#    check:
+#      - type: CheckHumidity
+#        humidity: 70
+#        deltaTime: 0.5
+#        mode: 1
+#      - type: CheckInstrumentFlag
+#        instrument: dome
+#        flag: humidity
+#        mode: 2
+#    responses:
+#      - type: UnlockInstrument
+#        instrument: dome
+#        key: humidity
+##      - type: DeactivateItem
+##        item: UnlockHumidity
+#
+#  - name: UnlockWind
+#    eager: True
+#    comment: Unlock dome in case wind is lower than a threshold for a specific period of time
+#    check:
+#      - type: CheckWindSpeed
+#        windspeed: 13.0
+#        deltaTime: 1.0
+#        mode: 1
+#      - type: CheckInstrumentFlag
+#        instrument: dome
+#        flag: wind
+#        mode: 2
+#    responses:
+#      - type: UnlockInstrument
+#        instrument: dome
+#        key: wind
+##      - type: DeactivateItem
+##        item: UnlockWind

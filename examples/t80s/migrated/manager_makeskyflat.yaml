@@ -1,0 +1,31 @@
+checklist:
+  TakeSkyFlats:
+    description: Make sky flats at the beginning of the night.
+    on_error: abort
+    conditions:
+    - condition: time
+      after: sunset
+      offset: -9m
+    - condition: time
+      before: sunset
+      offset: 12m
+    - condition: dome
+      slit: open
+    - condition: flag
+      instrument: scheduler
+      is_not: operating
+    - condition: flag
+      instrument: SkyFlat
+      is: ready
+    responses:
+    - action: set_flag
+      instrument: SkyFlat
+      flag: operating
+    - action: telescope
+      do: open_cover
+    - action: run_script
+      path: /mnt/public/t80s_scripts/scripts/switch_lamp_off.sh
+    - action: configure_scheduler
+      file: /mnt/public/skyflats/skyflat.yaml
+    - action: scheduler
+      do: start

@@ -1,0 +1,159 @@
+checklist:
+  OpenAndStartRoboObs:
+    description: Open dome and telescope and start robobs
+    active: false
+    on_error: abort
+    conditions:
+    - condition: ask_operator
+      question: Open telescope and start RoboObs?
+      timeout: 2m
+    responses:
+    - action: set_flag
+      instrument: site
+      flag: ready
+    - action: set_flag
+      instrument: scheduler
+      flag: ready
+    - action: telescope
+      do: unpark
+    - action: dome
+      do: open_slit
+    - action: dome
+      do: track
+    - action: lamp
+      do: switch_off
+      lamp: /SchneiderOTBLamp/building
+    - action: dome
+      do: open_flap
+    - action: telescope
+      do: open_cover
+    - action: run_script
+      path: /mnt/public/t80s_scripts/scripts/switch_lamp_off.sh
+    - action: robobs
+      do: start
+  OpenDomeFlapAtNightStart:
+    description: Prepare telescope for night start.
+    on_error: abort
+    conditions:
+    - condition: time
+      after: sunset_twilight_end
+      offset: -30m
+    - condition: time
+      before: sunset_twilight_end
+    - condition: dome
+      slit: open
+    responses:
+    - action: dome
+      do: open_flap
+    - action: dome
+      do: track
+    - action: fan
+      do: switch_off
+      fan: /CSKFan/DomeFanEast
+    - action: fan
+      do: switch_off
+      fan: /CSKFan/DomeFanWest
+    - action: telescope
+      do: open_cover
+    - action: fan
+      do: switch_off
+      fan: /SchneiderOTBFan/M1
+    - action: run_script
+      path: /mnt/public/t80s_scripts/scripts/switch_lamp_off.sh
+    - action: robobs
+      do: start
+  TakeSkyFlats:
+    description: Make sky flats at the beginning of the night.
+    on_error: abort
+    conditions:
+    - condition: time
+      after: sunset
+      offset: -9m
+    - condition: time
+      before: sunset
+      offset: 12m
+    - condition: dome
+      slit: open
+    - condition: flag
+      instrument: scheduler
+      is_not: operating
+    - condition: ask_operator
+      question: Ready to start sky flats at start of the night. Ok to proceed?
+      timeout: 2m
+    responses:
+    - action: telescope
+      do: open_cover
+    - action: run_script
+      path: /mnt/public/t80s_scripts/scripts/switch_lamp_off.sh
+    - action: configure_scheduler
+      file: /mnt/public/skyflats/skyflat.yaml
+    - action: scheduler
+      do: start
+  ParkTelescope:
+    active: false
+    conditions:
+    - condition: ask_operator
+      question: Park telescope?
+      timeout: 2m
+    responses:
+    - action: stop_all
+    - action: fan
+      do: switch_off
+      fan: /CSKFan/DomeFanEast
+    - action: fan
+      do: switch_off
+      fan: /CSKFan/DomeFanWest
+    - action: fan
+      do: switch_off
+      fan: /SchneiderOTBFan/M1
+    - action: telescope
+      do: close_cover
+    - action: dome
+      do: close_slit
+    - action: dome
+      do: slew
+      azimuth: 90.0
+    - action: telescope
+      do: park
+  OperatorLock:
+    active: false
+    conditions:
+    - condition: ask_operator
+      question: Lock telescope?
+      timeout: 2m
+    responses:
+    - action: stop_all
+    - action: fan
+      do: switch_off
+      fan: /CSKFan/DomeFanEast
+    - action: fan
+      do: switch_off
+      fan: /CSKFan/DomeFanWest
+    - action: fan
+      do: switch_off
+      fan: /SchneiderOTBFan/M1
+    - action: telescope
+      do: close_cover
+    - action: dome
+      do: close_slit
+    - action: dome
+      do: slew
+      azimuth: 90.0
+    - action: lock
+      instrument: dome
+      key: operator
+  OperatorUnLock:
+    description: Unlock dome and site by operator.
+    active: false
+    on_error: abort
+    conditions:
+    - condition: ask_operator
+      question: Unlock site and dome?
+      timeout: 2m
+    responses:
+    - action: unlock
+      instrument: dome
+      key: operator
+    - action: set_flag
+      instrument: dome
+      flag: ready

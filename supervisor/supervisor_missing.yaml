@@ -1,0 +1,69 @@
+hecklist:
+  - name: CheckWS02_OK
+    eager: False
+    check:
+      - type: CheckWeatherStation
+        index: 2
+      - type: CheckInstrumentFlag
+        instrument: weatherstations_02
+        mode: 1
+        flag: READY
+    responses:
+      - type: SetInstrumentFlag
+        instrument: weatherstations_02
+        flag: 1
+
+  - name: CheckWS02_NOTOK
+    eager: False
+    check:
+      - type: CheckWeatherStation
+        index: 2
+        mode: 1
+      - type: CheckInstrumentFlag
+        instrument: weatherstations_02
+        mode: 1
+        flag: CLOSE
+    responses:
+      - type: SetInstrumentFlag
+        instrument: weatherstations_02
+        flag: 3
+hecklist:
+  - name: CheckWS01_OK
+    eager: False
+    check:
+      - type: CheckWeatherStation
+        index: 2
+      - type: CheckInstrumentFlag
+        instrument: weatherstations_01
+        mode: 1
+        flag: READY
+    responses:
+      - type: SetInstrumentFlag
+        instrument: weatherstations_01
+        flag: 1
+
+  - name: CheckWS01_NOTOK
+    eager: False
+    check:
+      - type: CheckWeatherStation
+        index: 2
+        mode: 1
+      - type: CheckInstrumentFlag
+        instrument: weatherstations_01
+        mode: 1
+        flag: CLOSE
+    responses:
+      - type: SetInstrumentFlag
+        instrument: weatherstations_01
+        flag: 3
+#  - name: SwitchDomeLightOnSunrise
+#    eager: False
+#    comment: Stop all instruments, close telescope and dome, and lock dome at sunrise.
+#    check:
+#      - type: CheckTime
+#        mode: 4
+#        deltaTime: 0.2
+#    responses:
+#      - type: DomeAction
+#        mode: 7
+#        parameter: /SchneiderOTBLamp/building

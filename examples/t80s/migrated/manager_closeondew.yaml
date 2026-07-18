@@ -1,0 +1,42 @@
+checklist:
+  CloseOnDew:
+    description: Stop all instruments, close telescope and dome if temperature is
+      closer than threshold from dew point
+    conditions:
+    - condition: dome
+      slit: open
+    - condition: dew_gap
+      below: 4.0
+    responses:
+    - action: fan
+      do: switch_off
+      fan: /CSKFan/DomeFanEast
+    - action: fan
+      do: switch_off
+      fan: /CSKFan/DomeFanWest
+    - action: fan
+      do: switch_off
+      fan: /SchneiderOTBFan/M1
+    - action: stop_all
+    - action: telescope
+      do: close_cover
+    - action: dome
+      do: close_slit
+    - action: lock
+      instrument: dome
+      key: dew
+  DailightCloseOnDew:
+    description: Stop all instruments, close telescope and dome if temperature is
+      closer than threshold from dew point
+    conditions:
+    - condition: flag
+      instrument: dome
+      not_locked_with_key: dew
+    - condition: dew_gap
+      below: 4.0
+    - condition: dome
+      slit: closed
+    responses:
+    - action: lock
+      instrument: dome
+      key: dew

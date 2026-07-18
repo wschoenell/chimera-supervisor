@@ -1,0 +1,15 @@
+checklist:
+  - name: UnlockDew
+    eager: True
+    comment: Unlock dome in case humidity is lower than a threshold for a specific period of time
+    check:
+      - type: CheckDew
+        tempdiff: 5
+        deltaTime: 0.5
+        mode: 1
+    responses:
+      - type: UnlockInstrument
+        instrument: dome
+        key: dew
+#      - type: DeactivateItem
+#        item: UnlockDew

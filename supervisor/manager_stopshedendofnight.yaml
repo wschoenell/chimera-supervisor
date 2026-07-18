@@ -1,0 +1,107 @@
+checklist:
+
+#  - name: TakeSkyFlats
+#    eager: False
+#    eager_response: False
+#    comment: Make sky flats at the beginning of the night.
+#    check:
+#      - type: CheckTime
+#        mode: 1
+#        deltaTime: -0.15
+#      - type: CheckTime
+#        mode: -1
+#        deltaTime: +0.2
+#      - type: CheckDome
+#        mode: 0
+#      - type: CheckInstrumentFlag
+#        instrument: scheduler
+#        flag: OPERATING
+#        mode: 1 
+#      - type: AskListener
+#        question: Ready to start sky flats at start of the night. Ok to proceed?
+#        waittime: 120
+#    responses:
+#      - type: TelescopeAction
+#        mode: 2
+#      - type: ConfigureScheduler
+#        filename: "/mnt/public/skyflats/skyflat.yaml"
+#      - type: StartScheduler
+#      - type: DomeAction
+#        mode: 6
+#        parameter: /CSKFan/DomeFanEast
+#
+  - name: StopSchedEnd
+    eager: False
+    eager_response: False
+    comment: Make sky flats at the end of the night.
+    check:
+      - type: CheckTime
+        mode: 5
+        deltaTime: 0.33
+      - type: CheckTime
+        mode: -5
+        deltaTime: 0.6
+      - type: CheckDome
+        mode: 0
+      - type: CheckInstrumentFlag
+        instrument: scheduler
+        flag: OPERATING
+        mode: 0 
+#      - type: AskListener
+#        question: End of night, scheduler still running. Stop all?
+#        waittime: 120
+    responses:
+      - type: StopAll
+
+  - name: TakeSkyFlatsEnd
+    eager: False
+    eager_response: False
+    comment: Make sky flats at the end of the night.
+    check:
+      - type: CheckTime
+        mode: 5
+        deltaTime: 0.65
+      - type: CheckTime
+        mode: -5
+        deltaTime: 0.80
+      - type: CheckDome
+        mode: 0
+      - type: CheckInstrumentFlag
+        instrument: scheduler
+        flag: OPERATING
+        mode: 1 
+#      - type: AskListener
+#        question: Ready to start sky flats at the end of the night. Ok to proceed?
+#        waittime: 120
+    responses:
+      - type: StopRobObs
+      - type: DomeAction
+        mode: 3
+      - type: ConfigureScheduler
+        filename: "/mnt/public/skyflats/skyflat.yaml"
+      - type: StartScheduler
+
+#
+#  - name: StopRobObsEnd
+#    eager: False
+#    eager_response: False
+#    comment: Stops robobs at the end of the night
+#    check:
+#      - type: CheckTime
+#        mode: 5
+#        deltaTime: -0.25
+#      - type: CheckTime
+#        mode: -5
+#        deltaTime: 0.25
+#      - type: CheckDome
+#        mode: 0
+#      - type: CheckInstrumentFlag
+#        instrument: scheduler
+#        flag: OPERATING
+#        mode: 0 
+##      - type: AskListener
+##        question: End of night, scheduler still running. Stop all?
+##        waittime: 120
+#    responses:
+#      - type: StopRobObs
+

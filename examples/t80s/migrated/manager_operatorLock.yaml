@@ -1,0 +1,43 @@
+checklist:
+  OperatorLock:
+    active: false
+    conditions:
+    - condition: ask_operator
+      question: Lock telescope?
+      timeout: 2m
+    responses:
+    - action: lock
+      instrument: dome
+      key: operator
+    - action: stop_all
+    - action: fan
+      do: switch_off
+      fan: /CSKFan/DomeFanEast
+    - action: fan
+      do: switch_off
+      fan: /CSKFan/DomeFanWest
+    - action: fan
+      do: switch_off
+      fan: /SchneiderOTBFan/M1
+    - action: telescope
+      do: close_cover
+    - action: dome
+      do: close_slit
+    - action: dome
+      do: slew
+      azimuth: 90.0
+  OperatorUnLock:
+    description: Unlock dome and site by operator.
+    active: false
+    on_error: abort
+    conditions:
+    - condition: ask_operator
+      question: Unlock site and dome?
+      timeout: 2m
+    responses:
+    - action: unlock
+      instrument: dome
+      key: operator
+    - action: set_flag
+      instrument: dome
+      flag: ready

@@ -1,0 +1,18 @@
+checklist:
+  TestTransparencyUnLock:
+    conditions:
+    - condition: transparency
+      above: 40.0
+      for: 15m
+    - condition: flag
+      instrument: site
+      locked_with_key: transparency
+    responses:
+    - action: unlock
+      instrument: site
+      key: transparency
+    - action: set_flag
+      instrument: site
+      flag: ready
+    - action: send_photo
+      url: /mnt/public/allsky/AllSkyCurrentImage.JPG

@@ -1,0 +1,12 @@
+checklist:
+  CheckTelescopeParked:
+    conditions:
+    - condition: telescope
+      state: parked
+    - condition: flag
+      instrument: telescope
+      is: close
+    responses:
+    - action: set_flag
+      instrument: telescope
+      flag: close

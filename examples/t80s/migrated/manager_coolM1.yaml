@@ -1,0 +1,23 @@
+checklist:
+  CoolM1:
+    description: If dome is open and M1 temperature is higher than FrontRing, switch
+      on M1 fan
+    on_error: abort
+    conditions:
+    - condition: dome
+      slit: open
+    - condition: flag
+      instrument: site
+      is: ready
+    - condition: flag
+      instrument: dome
+      is_not: lock
+    - condition: telescope
+      state: m1_warmer_than_front_ring
+    - condition: time
+      before: sunset_twilight_end
+      offset: -30m
+    responses:
+    - action: fan
+      do: switch_on
+      fan: /SchneiderOTBFan/M1

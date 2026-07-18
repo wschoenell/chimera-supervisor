@@ -1,0 +1,19 @@
+checklist:
+  MakeQueue:
+    description: Prepare observing queue for the night by running a shell script.
+    on_error: abort
+    conditions:
+    - condition: time
+      after: sunrise
+      offset: 30m
+    responses:
+    - action: run_script
+      path: /mnt/public/t80s_scripts/scripts/plan_robobs.sh
+    - action: notify
+      message: Last night observations
+    - action: send_photo
+      url: /home/chimera/robobs-work/foo2.png
+    - action: notify
+      message: Tonight observations plan
+    - action: send_photo
+      url: /home/chimera/robobs-work/foo.png

@@ -1,0 +1,14 @@
+checklist:
+
+  - name: CleanQueueBadWeather
+    eager: False
+    active: False
+    check:
+     - type: AskListener
+       question: Test action?
+       waittime: 120
+    responses:
+      - type: ExecuteScript
+        filename: /mnt/public/t80s_scripts/scripts/clear_queue_badweather.sh
+      - type: SendPhoto
+        path: /mnt/public/allsky/AllSkyCurrentImage.JPG

@@ -1,0 +1,12 @@
+checklist:
+
+  - name: PowerOff
+    eager: False
+    active: False
+    check:
+     - type: AskListener
+       question: Test action?
+       waittime: 120
+    responses:
+      - type: SendTelegram
+        message: WARNING! Power cut detected on T80! Please check instruments.

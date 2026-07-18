@@ -1,0 +1,15 @@
+checklist:
+  - name: GetObsProgress
+    eager: False
+    active: False
+    check:
+     - type: AskListener
+       question: Send AllSky Image? 
+       waittime: 120
+    responses:
+      - type: ExecuteScript
+        filename: /mnt/public/t80s_scripts/scripts/obs_progress.sh
+      - type: SendPhoto
+        path: /home/chimera/robobs-work/foo.png
+
+

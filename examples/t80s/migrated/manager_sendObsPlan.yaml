@@ -1,0 +1,10 @@
+checklist:
+  SendObsPlan:
+    active: false
+    conditions:
+    - condition: ask_operator
+      question: Send Observation Plan?
+      timeout: 2m
+    responses:
+    - action: send_photo
+      url: /home/chimera/robobs-work/foo.png

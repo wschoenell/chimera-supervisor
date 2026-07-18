@@ -1,0 +1,19 @@
+checklist:
+  StopRobObsEnd:
+    description: Stops robobs at the end of the night
+    on_error: abort
+    conditions:
+    - condition: time
+      after: sunrise_twilight_begin
+      offset: -3m
+    - condition: time
+      before: sunrise_twilight_begin
+      offset: 27m
+    - condition: dome
+      slit: open
+    - condition: flag
+      instrument: scheduler
+      is: operating
+    responses:
+    - action: robobs
+      do: stop

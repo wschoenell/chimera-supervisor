@@ -1,0 +1,15 @@
+checklist:
+  PhometricLastNight:
+    description: Calculate the variability of the stars for main survey observations.
+    on_error: abort
+    conditions:
+    - condition: time
+      after: sunrise
+      offset: 30m
+    responses:
+    - action: run_script
+      path: /mnt/public/t80s_scripts/scripts/darknight_lastnight.sh
+    - action: notify
+      message: Last night MS variability
+    - action: send_photo
+      url: /mnt/public/herpich/darknight/photo.png

@@ -1,0 +1,107 @@
+checklist:
+  - name: OpenDomeAtSunset
+    eager: True
+    eager_response: False
+    comment: Open dome at sunset and start fans
+    check:
+      - type: CheckTime
+        mode: 1
+        deltaTime: -2.0
+      - type: CheckDome
+        mode: 1
+#      - type: CheckTransparency
+#        mode: 1
+#        transparency: 35
+      - type: CheckInstrumentFlag
+        instrument: site
+        mode: 0
+        flag: READY
+      - type: CheckInstrumentFlag
+        instrument: dome
+        mode: 1
+        flag: LOCK
+#      - type: AskListener
+#        question: Ready to open dome and start fans. Should I proceed?
+#        waittime: 120
+    responses:
+      - type: SetInstrumentFlag
+        instrument: site
+        flag: 1
+      - type: SetInstrumentFlag
+        instrument: scheduler
+        flag: 1
+      - type: SetInstrumentFlag
+        instrument: SkyFlat
+        flag: 1
+      - type: TelescopeAction
+        mode: 0
+      - type: SetInstrumentFlag
+        instrument: dome
+        flag: 1
+      - type: DomeAction
+        mode: 0
+      - type: DomeAction
+        mode: 9
+      - type: DomeAction
+        mode: 5
+        parameter: /CSKFan/DomeFanEast,600
+      - type: DomeAction
+        mode: 5
+        parameter: /CSKFan/DomeFanWest,600
+      - type: DomeAction
+        mode: 8
+        parameter: /SchneiderOTBLamp/building
+      - type: DomeAction
+        mode: 4
+        parameter: oppose-sun
+      - type: TelescopeAction # Temporary
+        mode: 2               # Temporary
+      - type: SendPhoto
+        path: http://admin:@192.168.20.114/image.jpg
+
+#checklist:
+  - name: OpposeSun
+    eager: False
+    eager_response: False
+    active: False
+    comment: Oppose dome to the Sun
+    check:
+      - type: AskListener
+        question: Ready to open dome and start fans. Should I proceed?
+        waittime: 120
+    responses:
+      - type: DomeAction
+        mode: 4
+        parameter: oppose-sun
+
+
+#
+#  - name: TakeSkyFlats
+#    eager: False
+#    eager_response: False
+#    comment: Make sky flats at the beginning of the night.
+#    check:
+#      - type: CheckTime
+#        mode: 1
+#        deltaTime: -0.15
+#      - type: CheckTime
+#        mode: -1
+#        deltaTime: +0.2
+#      - type: CheckDome
+#        mode: 0
+#      - type: CheckInstrumentFlag
+#        instrument: scheduler
+#        flag: OPERATING
+#        mode: 1 
+#      - type: AskListener
+#        question: Ready to start sky flats at start of the night. Ok to proceed?
+#        waittime: 120
+#    responses:
+#      - type: TelescopeAction
+#        mode: 2
+#      - type: ConfigureScheduler
+#        filename: "/mnt/public/skyflats/skyflat.yaml"
+#      - type: StartScheduler
+#      - type: ExecuteScript
+#        filename: /home/chimera/.chimera/switch_lamp_off.sh
+
