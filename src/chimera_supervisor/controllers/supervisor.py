@@ -55,6 +55,9 @@ class Supervisor(ChimeraObject):
         "telegram_listen_ids": None,  # chat ids allowed to answer questions
         "freq": 0.01,  # checklist frequency (Hz)
         "max_weather_age": 10.0,  # minutes before weather data is stale
+        # bound on every proxied instrument call (seconds): a hung
+        # instrument fails the action instead of freezing the engine
+        "proxy_timeout": 300.0,
     }
 
     def __init__(self):
@@ -216,7 +219,11 @@ class Supervisor(ChimeraObject):
         proxies = []
         for location in self._locations.get(role, []):
             try:
-                proxies.append(self.get_proxy(location))
+                proxy = self.get_proxy(location)
+                # older cores have no per-proxy timeout: degrade to unbounded
+                if hasattr(proxy, "__timeout__"):
+                    proxy.__timeout__ = float(self["proxy_timeout"])
+                proxies.append(proxy)
             except Exception:
                 self.log.warning("could not get proxy for %s (%s)", role, location)
         return proxies
