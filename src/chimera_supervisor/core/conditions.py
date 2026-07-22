@@ -73,9 +73,13 @@ def condition_kinds() -> list[str]:
 def parse_condition(cfg: object, source: str) -> "Condition":
     """Build a condition from one entry of a ``conditions:`` list."""
     if not isinstance(cfg, dict):
-        raise ConfigError(f"condition entry must be a mapping, got {cfg!r}", source=source)
+        raise ConfigError(
+            f"condition entry must be a mapping, got {cfg!r}", source=source
+        )
     if "condition" not in cfg:
-        raise ConfigError(f"condition entry missing 'condition:' key: {cfg!r}", source=source)
+        raise ConfigError(
+            f"condition entry missing 'condition:' key: {cfg!r}", source=source
+        )
     kind = str(cfg["condition"]).strip().lower()
     try:
         cls = _REGISTRY[kind]
@@ -157,7 +161,9 @@ class TimeCondition(Condition):
             try:
                 offset = parse_duration(cfg["offset"], default_unit="h")
             except ValueError as e:
-                raise ConfigError(f"condition: time: offset: {e}", source=source) from None
+                raise ConfigError(
+                    f"condition: time: offset: {e}", source=source
+                ) from None
         return cls(when=when, reference=reference, offset=offset)
 
     def to_config(self) -> dict:
@@ -175,15 +181,25 @@ class TimeCondition(Condition):
                 hour=int(match["h"]), minute=int(match["m"]), second=0, microsecond=0
             )
         if self.reference == "sunset_twilight_end":
-            # computed from the sunset instant, with the same day-wrap
-            # correction the legacy TimeHandler applied
+            # computed from the sunset instant, as the legacy TimeHandler did
             sunset = naive_utc(site.sunset(now.date()))
             reference = naive_utc(site.sunset_twilight_end(sunset))
-            if reference - now > datetime.timedelta(hours=12):
-                reference -= datetime.timedelta(days=1)
-            return reference
-        method = getattr(site, self.reference)
-        return naive_utc(method(now.date()))
+        else:
+            reference = naive_utc(getattr(site, self.reference)(now.date()))
+
+        # The site returns the NEXT occurrence of the event, so once the UTC
+        # date rolls over an EVENING reference jumps to tomorrow's - and a
+        # condition like `after: sunset` can never be true again for the
+        # night already under way. Seen 2026-07-22: open_dome_at_sunset went
+        # false at midnight, so a night interrupted after that could not be
+        # resumed and the dome stayed shut. Morning references are exempt:
+        # during the night the coming sunrise is genuinely ahead of us, and
+        # rolling one back would fire lock_dome_on_sunrise in the afternoon.
+        if self.reference.startswith("sunset") and reference - now > datetime.timedelta(
+            hours=12
+        ):
+            reference -= datetime.timedelta(days=1)
+        return reference
 
     def evaluate(self, ctx: Context, memory: MemorySlot) -> Result:
         now = ctx.utcnow()
@@ -224,7 +240,11 @@ class DomeCondition(Condition):
         )
         part = one_of(cfg, {"slit", "flap"}, kind="condition: dome", source=source)
         state = as_choice(
-            cfg[part], {"open", "closed"}, kind="condition: dome", key=part, source=source
+            cfg[part],
+            {"open", "closed"},
+            kind="condition: dome",
+            key=part,
+            source=source,
         )
         return cls(part=part, state=state)
 
@@ -283,7 +303,11 @@ class TelescopeCondition(Condition):
             required={"state"},
         )
         state = as_choice(
-            cfg["state"], cls._STATES, kind="condition: telescope", key="state", source=source
+            cfg["state"],
+            cls._STATES,
+            kind="condition: telescope",
+            key="state",
+            source=source,
         )
         return cls(state=state)
 
@@ -346,7 +370,10 @@ class WeatherStationCondition(Condition):
             allowed={"condition", "station", "state"},
         )
         station = as_int(
-            cfg.get("station", 0), kind="condition: weather_station", key="station", source=source
+            cfg.get("station", 0),
+            kind="condition: weather_station",
+            key="station",
+            source=source,
         )
         state = as_choice(
             cfg.get("state", "ok"),
@@ -404,7 +431,10 @@ class WeatherThresholdCondition(Condition):
     def _from_config(cls, cfg: dict, source: str) -> "WeatherThresholdCondition":
         label = f"condition: {cls.kind}"
         check_keys(
-            cfg, kind=label, source=source, allowed={"condition", "above", "below", "for"}
+            cfg,
+            kind=label,
+            source=source,
+            allowed={"condition", "above", "below", "for"},
         )
         which = one_of(cfg, {"above", "below"}, kind=label, source=source)
         threshold = as_float(cfg[which], kind=label, key=which, source=source)
@@ -453,7 +483,9 @@ class WeatherThresholdCondition(Condition):
         measured = self._read_first_fresh(ctx)
         if measured is None:
             if self.duration is None:
-                return Result(True, f"no fresh {self.quantity} data — assuming unsafe (fail-safe)")
+                return Result(
+                    True, f"no fresh {self.quantity} data — assuming unsafe (fail-safe)"
+                )
             return Result(False, f"no fresh {self.quantity} data — holding (fail-safe)")
 
         if self.above is not None:
@@ -477,7 +509,9 @@ class WeatherThresholdCondition(Condition):
         since = memory.get()
         if since is None:
             memory.set(now)
-            return Result(False, f"{comparison}; started timing {format_duration(self.duration)}")
+            return Result(
+                False, f"{comparison}; started timing {format_duration(self.duration)}"
+            )
         elapsed = now - since
         if elapsed >= self.duration:
             memory.set(now)  # restart the timer after a successful pass
@@ -562,7 +596,12 @@ class FlagCondition(Condition):
     test: str  # "is" | "is_not" | "locked_with_key" | "not_locked_with_key"
     value: str
 
-    _TESTS: ClassVar[set[str]] = {"is", "is_not", "locked_with_key", "not_locked_with_key"}
+    _TESTS: ClassVar[set[str]] = {
+        "is",
+        "is_not",
+        "locked_with_key",
+        "not_locked_with_key",
+    }
 
     @classmethod
     def _from_config(cls, cfg: dict, source: str) -> "FlagCondition":
@@ -579,15 +618,22 @@ class FlagCondition(Condition):
                 value = InstrumentOperationFlag.parse(cfg[test]).value
             except (ValueError, IndexError):
                 raise ConfigError(
-                    f"condition: flag: unknown instrument flag {cfg[test]!r}", source=source
+                    f"condition: flag: unknown instrument flag {cfg[test]!r}",
+                    source=source,
                 ) from None
         else:
             value = as_str(cfg[test], kind="condition: flag", key=test, source=source)
-        instrument = as_str(cfg["instrument"], kind="condition: flag", key="instrument", source=source)
+        instrument = as_str(
+            cfg["instrument"], kind="condition: flag", key="instrument", source=source
+        )
         return cls(instrument=instrument, test=test, value=value)
 
     def to_config(self) -> dict:
-        return {"condition": self.kind, "instrument": self.instrument, self.test: self.value}
+        return {
+            "condition": self.kind,
+            "instrument": self.instrument,
+            self.test: self.value,
+        }
 
     def evaluate(self, ctx: Context, memory: MemorySlot) -> Result:
         flags = ctx.flags
@@ -629,8 +675,15 @@ class AskOperatorCondition(Condition):
             try:
                 timeout = parse_duration(cfg["timeout"], default_unit="s")
             except ValueError as e:
-                raise ConfigError(f"condition: ask_operator: timeout: {e}", source=source) from None
-        question = as_str(cfg["question"], kind="condition: ask_operator", key="question", source=source)
+                raise ConfigError(
+                    f"condition: ask_operator: timeout: {e}", source=source
+                ) from None
+        question = as_str(
+            cfg["question"],
+            kind="condition: ask_operator",
+            key="question",
+            source=source,
+        )
         return cls(question=question, timeout=timeout)
 
     def to_config(self) -> dict:

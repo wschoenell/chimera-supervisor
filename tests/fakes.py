@@ -217,6 +217,7 @@ class FakeStartStop:
 def make_context(**overrides) -> Context:
     """A fully-populated context over fakes and an in-memory state store."""
     store = overrides.pop("flags", StateStore(":memory:"))
+    site = overrides.pop("site", FakeSite())
     switches = {}
 
     def resolve(location):
@@ -225,7 +226,7 @@ def make_context(**overrides) -> Context:
         return switches[location]
 
     ctx = Context(
-        site=FakeSite(),
+        site=site,
         telescopes=[FakeTelescope()],
         domes=[FakeDome()],
         weather_stations=[FakeWeatherStation()],

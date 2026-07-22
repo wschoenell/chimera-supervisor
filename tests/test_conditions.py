@@ -12,7 +12,7 @@ from chimera_supervisor.core.conditions import (
 from chimera_supervisor.core.exceptions import ConfigError
 from chimera_supervisor.core.flags import InstrumentOperationFlag as Flag
 
-from .fakes import make_context
+from .fakes import FakeSite, make_context
 
 
 def evaluate(cfg, ctx, memory=None):
@@ -34,9 +34,13 @@ def test_time_after_sunset_passes_at_night():
 def test_time_before_sunrise_with_offset():
     ctx = make_context()
     # sunrise at 10:00, now 03:00 -> before sunrise-2h (08:00) passes
-    assert evaluate({"condition": "time", "before": "sunrise", "offset": "-2h"}, ctx).passed
+    assert evaluate(
+        {"condition": "time", "before": "sunrise", "offset": "-2h"}, ctx
+    ).passed
     # before sunrise-8h (02:00) fails
-    assert not evaluate({"condition": "time", "before": "sunrise", "offset": "-8h"}, ctx).passed
+    assert not evaluate(
+        {"condition": "time", "before": "sunrise", "offset": "-8h"}, ctx
+    ).passed
 
 
 def test_time_fixed_hhmm():
@@ -48,7 +52,9 @@ def test_time_fixed_hhmm():
 
 def test_time_requires_exactly_one_direction():
     with pytest.raises(ConfigError):
-        parse_condition({"condition": "time", "after": "sunset", "before": "sunrise"}, "test")
+        parse_condition(
+            {"condition": "time", "after": "sunset", "before": "sunrise"}, "test"
+        )
     with pytest.raises(ConfigError):
         parse_condition({"condition": "time"}, "test")
 
@@ -85,18 +91,28 @@ def test_telescope_states():
 def test_telescope_m1_temperature():
     ctx = make_context()
     ctx.telescopes[0].sensors = [("TM1", 10.0), ("FrontRing", 12.0)]
-    assert evaluate({"condition": "telescope", "state": "m1_cooler_than_front_ring"}, ctx).passed
+    assert evaluate(
+        {"condition": "telescope", "state": "m1_cooler_than_front_ring"}, ctx
+    ).passed
     ctx.telescopes[0].sensors = [("TM1", 14.0), ("FrontRing", 12.0)]
-    assert evaluate({"condition": "telescope", "state": "m1_warmer_than_front_ring"}, ctx).passed
+    assert evaluate(
+        {"condition": "telescope", "state": "m1_warmer_than_front_ring"}, ctx
+    ).passed
 
 
 def test_weather_station_health():
     ctx = make_context()
-    assert evaluate({"condition": "weather_station", "station": 0, "state": "ok"}, ctx).passed
+    assert evaluate(
+        {"condition": "weather_station", "station": 0, "state": "ok"}, ctx
+    ).passed
     ctx.weather_stations[0].stale = True
-    assert evaluate({"condition": "weather_station", "station": 0, "state": "stale"}, ctx).passed
+    assert evaluate(
+        {"condition": "weather_station", "station": 0, "state": "stale"}, ctx
+    ).passed
     # out-of-range station counts as stale
-    assert evaluate({"condition": "weather_station", "station": 5, "state": "stale"}, ctx).passed
+    assert evaluate(
+        {"condition": "weather_station", "station": 5, "state": "stale"}, ctx
+    ).passed
 
 
 # ----------------------------------------------------------------------
@@ -126,7 +142,9 @@ def test_stale_data_is_fail_safe():
     # bare threshold: assume the weather is bad
     assert evaluate({"condition": "wind_speed", "above": 15}, ctx).passed
     # duration threshold (reopen-style): never pass on stale data
-    assert not evaluate({"condition": "wind_speed", "below": 15, "for": "1h"}, ctx).passed
+    assert not evaluate(
+        {"condition": "wind_speed", "below": 15, "for": "1h"}, ctx
+    ).passed
 
 
 def test_duration_threshold_requires_elapsed_time():
@@ -152,7 +170,9 @@ def test_duration_threshold_resets_when_comparison_breaks():
     memory = TransientMemory()
     memory.set(ctx.utcnow() - datetime.timedelta(hours=2))
     ctx.weather_stations[0].values["wind_speed"] = 20.0
-    assert not evaluate({"condition": "wind_speed", "below": 10, "for": "1h"}, ctx, memory).passed
+    assert not evaluate(
+        {"condition": "wind_speed", "below": 10, "for": "1h"}, ctx, memory
+    ).passed
     assert memory.get() == ctx.utcnow()  # clock restarted
 
 
@@ -196,13 +216,21 @@ def test_threshold_requires_exactly_one_direction():
 def test_flag_is_and_is_not():
     ctx = make_context()
     ctx.flags.set_flag("dome", Flag.READY)
-    assert evaluate({"condition": "flag", "instrument": "dome", "is": "ready"}, ctx).passed
-    assert evaluate({"condition": "flag", "instrument": "dome", "is_not": "lock"}, ctx).passed
-    assert not evaluate({"condition": "flag", "instrument": "dome", "is": "close"}, ctx).passed
+    assert evaluate(
+        {"condition": "flag", "instrument": "dome", "is": "ready"}, ctx
+    ).passed
+    assert evaluate(
+        {"condition": "flag", "instrument": "dome", "is_not": "lock"}, ctx
+    ).passed
+    assert not evaluate(
+        {"condition": "flag", "instrument": "dome", "is": "close"}, ctx
+    ).passed
 
 
 def test_flag_accepts_legacy_integer():
-    condition = parse_condition({"condition": "flag", "instrument": "dome", "is": 1}, "test")
+    condition = parse_condition(
+        {"condition": "flag", "instrument": "dome", "is": 1}, "test"
+    )
     assert condition.value == "ready"
 
 
@@ -213,7 +241,8 @@ def test_flag_lock_keys():
         {"condition": "flag", "instrument": "dome", "locked_with_key": "dew"}, ctx
     ).passed
     assert evaluate(
-        {"condition": "flag", "instrument": "dome", "not_locked_with_key": "operator"}, ctx
+        {"condition": "flag", "instrument": "dome", "not_locked_with_key": "operator"},
+        ctx,
     ).passed
 
 
@@ -236,3 +265,44 @@ def test_unknown_condition_kind():
 def test_unknown_key_rejected():
     with pytest.raises(ConfigError):
         parse_condition({"condition": "dome", "slit": "open", "mode": 1}, "test")
+
+
+class _NightSite(FakeSite):
+    """00:20 UT, mid-night: the next sunset is 20 h away."""
+
+    def __init__(self):
+        super().__init__(ut=datetime.datetime(2026, 7, 22, 0, 20))
+        self.sunset_time = datetime.datetime(2026, 7, 22, 20, 27)
+        self.sunrise_time = datetime.datetime(2026, 7, 22, 9, 39)
+
+
+class _AfternoonSite(FakeSite):
+    """18:00 UT: the next sunrise is >12 h away, sunset is soon."""
+
+    def __init__(self):
+        super().__init__(ut=datetime.datetime(2026, 7, 21, 18, 0))
+        self.sunset_time = datetime.datetime(2026, 7, 21, 20, 27)
+        self.sunrise_time = datetime.datetime(2026, 7, 22, 9, 39)
+
+
+def test_evening_reference_survives_utc_midnight():
+    """`after: sunset` must stay true for the night already under way.
+
+    site.sunset() returns the NEXT sunset, so once the UTC date rolls over
+    it jumps to tomorrow evening and the condition goes false. Seen live on
+    2026-07-22: open_dome_at_sunset stopped firing at midnight, so a night
+    interrupted after that could not be resumed and the dome stayed shut.
+    """
+    ctx = make_context(site=_NightSite())
+    for reference in ("sunset", "sunset_twilight_begin", "sunset_twilight_end"):
+        result = evaluate({"condition": "time", "after": reference}, ctx)
+        assert result.passed, f"{reference}: {result.message}"
+
+
+def test_morning_reference_is_not_rolled_back():
+    """The correction must not touch sunrise: in the afternoon the next
+    sunrise is >12 h away, and rolling it back would make `after: sunrise`
+    true and lock the dome in daylight."""
+    ctx = make_context(site=_AfternoonSite())
+    result = evaluate({"condition": "time", "after": "sunrise"}, ctx)
+    assert not result.passed, result.message
