@@ -50,9 +50,13 @@ def action_kinds() -> list[str]:
 def parse_action(cfg: object, source: str) -> "Action":
     """Build an action from one entry of a ``responses:`` list."""
     if not isinstance(cfg, dict):
-        raise ConfigError(f"response entry must be a mapping, got {cfg!r}", source=source)
+        raise ConfigError(
+            f"response entry must be a mapping, got {cfg!r}", source=source
+        )
     if "action" not in cfg:
-        raise ConfigError(f"response entry missing 'action:' key: {cfg!r}", source=source)
+        raise ConfigError(
+            f"response entry missing 'action:' key: {cfg!r}", source=source
+        )
     kind = str(cfg["action"]).strip().lower()
     try:
         cls = _REGISTRY[kind]
@@ -162,18 +166,29 @@ class DomeAction(Action):
             allowed={"action", "do", "azimuth"},
             required={"do"},
         )
-        do = as_choice(cfg["do"], cls._DOS, kind="action: dome", key="do", source=source)
+        do = as_choice(
+            cfg["do"], cls._DOS, kind="action: dome", key="do", source=source
+        )
         azimuth: float | str | None = None
         if do == "slew":
             if "azimuth" not in cfg:
-                raise ConfigError("action: dome: do: slew requires 'azimuth:'", source=source)
+                raise ConfigError(
+                    "action: dome: do: slew requires 'azimuth:'", source=source
+                )
             raw = cfg["azimuth"]
-            if isinstance(raw, str) and raw.strip().lower().replace("-", "_") == "oppose_sun":
+            if (
+                isinstance(raw, str)
+                and raw.strip().lower().replace("-", "_") == "oppose_sun"
+            ):
                 azimuth = "oppose_sun"
             else:
-                azimuth = as_float(raw, kind="action: dome", key="azimuth", source=source)
+                azimuth = as_float(
+                    raw, kind="action: dome", key="azimuth", source=source
+                )
         elif "azimuth" in cfg:
-            raise ConfigError("action: dome: 'azimuth:' only valid with do: slew", source=source)
+            raise ConfigError(
+                "action: dome: 'azimuth:' only valid with do: slew", source=source
+            )
         return cls(do=do, azimuth=azimuth)
 
     def to_config(self) -> dict:
@@ -186,13 +201,19 @@ class DomeAction(Action):
         for dome in ctx.domes:
             if self.do == "open_slit":
                 _broadcast(ctx, "Opening dome slit...")
-                _guarded_open(ctx, "dome", dome.is_slit_open, dome.open_slit, "open dome slit")
+                _guarded_open(
+                    ctx, "dome", dome.is_slit_open, dome.open_slit, "open dome slit"
+                )
             elif self.do == "close_slit":
                 _broadcast(ctx, "Closing dome slit...")
-                _guarded_close(ctx, "dome", dome.is_slit_open, dome.close_slit, "close dome slit")
+                _guarded_close(
+                    ctx, "dome", dome.is_slit_open, dome.close_slit, "close dome slit"
+                )
             elif self.do == "open_flap":
                 _broadcast(ctx, "Opening dome flap...")
-                _guarded_open(ctx, "dome", dome.is_flap_open, dome.open_flap, "open dome flap")
+                _guarded_open(
+                    ctx, "dome", dome.is_flap_open, dome.open_flap, "open dome flap"
+                )
             elif self.do == "close_flap":
                 # the dome may keep operating with the flap closed: no flag changes
                 if dome.is_flap_open():
@@ -250,18 +271,29 @@ class TelescopeAction(Action):
             allowed={"action", "do", "alt", "az", "ra", "dec"},
             required={"do"},
         )
-        do = as_choice(cfg["do"], cls._DOS, kind="action: telescope", key="do", source=source)
+        do = as_choice(
+            cfg["do"], cls._DOS, kind="action: telescope", key="do", source=source
+        )
         alt = az = ra = dec = None
         if do == "slew":
             if {"alt", "az"} <= set(cfg):
-                alt = as_float(cfg["alt"], kind="action: telescope", key="alt", source=source)
-                az = as_float(cfg["az"], kind="action: telescope", key="az", source=source)
+                alt = as_float(
+                    cfg["alt"], kind="action: telescope", key="alt", source=source
+                )
+                az = as_float(
+                    cfg["az"], kind="action: telescope", key="az", source=source
+                )
             elif {"ra", "dec"} <= set(cfg):
-                ra = as_str(cfg["ra"], kind="action: telescope", key="ra", source=source)
-                dec = as_str(cfg["dec"], kind="action: telescope", key="dec", source=source)
+                ra = as_str(
+                    cfg["ra"], kind="action: telescope", key="ra", source=source
+                )
+                dec = as_str(
+                    cfg["dec"], kind="action: telescope", key="dec", source=source
+                )
             else:
                 raise ConfigError(
-                    "action: telescope: do: slew requires alt:/az: or ra:/dec:", source=source
+                    "action: telescope: do: slew requires alt:/az: or ra:/dec:",
+                    source=source,
                 )
         elif set(cfg) & {"alt", "az", "ra", "dec"}:
             raise ConfigError(
@@ -303,8 +335,13 @@ class TelescopeAction(Action):
                     raise ActionError(f"could not park telescope: {e}") from e
             elif self.do == "open_cover":
                 if not ctx.flags.can_open("telescope"):
-                    _broadcast(ctx, "Cannot open telescope cover due to supervisor constraints.")
-                    raise ActionError("cannot open telescope cover: supervisor constraints")
+                    _broadcast(
+                        ctx,
+                        "Cannot open telescope cover due to supervisor constraints.",
+                    )
+                    raise ActionError(
+                        "cannot open telescope cover: supervisor constraints"
+                    )
                 _broadcast(ctx, "Opening telescope cover.")
                 tel.open_cover()
             elif self.do == "close_cover":
@@ -315,10 +352,14 @@ class TelescopeAction(Action):
                 tel.stop_tracking()
             elif self.do == "slew":
                 if self.alt is not None:
-                    _broadcast(ctx, f"Slewing telescope to alt/az {self.alt}/{self.az}.")
+                    _broadcast(
+                        ctx, f"Slewing telescope to alt/az {self.alt}/{self.az}."
+                    )
                     tel.slew_to_alt_az(self.alt, self.az)
                 else:
-                    _broadcast(ctx, f"Slewing telescope to ra/dec {self.ra}/{self.dec}.")
+                    _broadcast(
+                        ctx, f"Slewing telescope to ra/dec {self.ra}/{self.dec}."
+                    )
                     tel.slew_to_ra_dec(self.ra, self.dec)
 
 
@@ -347,14 +388,26 @@ class FanAction(Action):
             required={"do", "fan"},
         )
         do = as_choice(
-            cfg["do"], {"switch_on", "switch_off"}, kind="action: fan", key="do", source=source
+            cfg["do"],
+            {"switch_on", "switch_off"},
+            kind="action: fan",
+            key="do",
+            source=source,
         )
         speed = None
         if "speed" in cfg:
             if do == "switch_off":
-                raise ConfigError("action: fan: 'speed:' only valid with switch_on", source=source)
-            speed = as_float(cfg["speed"], kind="action: fan", key="speed", source=source)
-        return cls(do=do, fan=as_str(cfg["fan"], kind="action: fan", key="fan", source=source), speed=speed)
+                raise ConfigError(
+                    "action: fan: 'speed:' only valid with switch_on", source=source
+                )
+            speed = as_float(
+                cfg["speed"], kind="action: fan", key="speed", source=source
+            )
+        return cls(
+            do=do,
+            fan=as_str(cfg["fan"], kind="action: fan", key="fan", source=source),
+            speed=speed,
+        )
 
     def to_config(self) -> dict:
         out: dict = {"action": self.kind, "do": self.do, "fan": self.fan}
@@ -374,10 +427,15 @@ class FanAction(Action):
                     _broadcast(ctx, f"Could not start fan {self.fan}.")
                 if self.speed is not None:
                     try:
-                        _broadcast(ctx, f"Setting fan {self.fan} speed to {self.speed:g}.")
+                        _broadcast(
+                            ctx, f"Setting fan {self.fan} speed to {self.speed:g}."
+                        )
                         fan.set_rotation(self.speed)
                     except Exception:
-                        _broadcast(ctx, f"Could not set fan {self.fan} speed to {self.speed:g}.")
+                        _broadcast(
+                            ctx,
+                            f"Could not set fan {self.fan} speed to {self.speed:g}.",
+                        )
             else:
                 if not fan.is_switched_on():
                     _broadcast(ctx, f"Fan {self.fan} is already off.")
@@ -411,9 +469,16 @@ class LampAction(Action):
             required={"do", "lamp"},
         )
         do = as_choice(
-            cfg["do"], {"switch_on", "switch_off"}, kind="action: lamp", key="do", source=source
+            cfg["do"],
+            {"switch_on", "switch_off"},
+            kind="action: lamp",
+            key="do",
+            source=source,
         )
-        return cls(do=do, lamp=as_str(cfg["lamp"], kind="action: lamp", key="lamp", source=source))
+        return cls(
+            do=do,
+            lamp=as_str(cfg["lamp"], kind="action: lamp", key="lamp", source=source),
+        )
 
     def to_config(self) -> dict:
         return {"action": self.kind, "do": self.do, "lamp": self.lamp}
@@ -468,18 +533,29 @@ class SetFlagAction(Action):
         except ValueError as e:
             raise ConfigError(f"action: set_flag: {e}", source=source) from None
         return cls(
-            instrument=as_str(cfg["instrument"], kind="action: set_flag", key="instrument", source=source),
+            instrument=as_str(
+                cfg["instrument"],
+                kind="action: set_flag",
+                key="instrument",
+                source=source,
+            ),
             flag=flag,
         )
 
     def to_config(self) -> dict:
-        return {"action": self.kind, "instrument": self.instrument, "flag": self.flag.value}
+        return {
+            "action": self.kind,
+            "instrument": self.instrument,
+            "flag": self.flag.value,
+        }
 
     def execute(self, ctx: Context) -> None:
         try:
             ctx.flags.set_flag(self.instrument, self.flag)
         except Exception as e:
-            raise ActionError(f"could not set {self.instrument} flag to {self.flag}: {e}") from e
+            raise ActionError(
+                f"could not set {self.instrument} flag to {self.flag}: {e}"
+            ) from e
 
 
 @dataclass(frozen=True)
@@ -499,7 +575,9 @@ class LockAction(Action):
             required={"instrument", "key"},
         )
         return cls(
-            instrument=as_str(cfg["instrument"], kind="action: lock", key="instrument", source=source),
+            instrument=as_str(
+                cfg["instrument"], kind="action: lock", key="instrument", source=source
+            ),
             key=as_str(cfg["key"], kind="action: lock", key="key", source=source),
         )
 
@@ -532,7 +610,12 @@ class UnlockAction(Action):
             required={"instrument", "key"},
         )
         return cls(
-            instrument=as_str(cfg["instrument"], kind="action: unlock", key="instrument", source=source),
+            instrument=as_str(
+                cfg["instrument"],
+                kind="action: unlock",
+                key="instrument",
+                source=source,
+            ),
             key=as_str(cfg["key"], kind="action: unlock", key="key", source=source),
         )
 
@@ -571,7 +654,11 @@ class NotifyAction(Action):
             allowed={"action", "message"},
             required={"message"},
         )
-        return cls(message=as_str(cfg["message"], kind="action: notify", key="message", source=source))
+        return cls(
+            message=as_str(
+                cfg["message"], kind="action: notify", key="message", source=source
+            )
+        )
 
     def to_config(self) -> dict:
         return {"action": self.kind, "message": self.message}
@@ -638,9 +725,16 @@ class AskOperatorAction(Action):
             try:
                 timeout = parse_duration(cfg["timeout"], default_unit="s")
             except ValueError as e:
-                raise ConfigError(f"action: ask_operator: timeout: {e}", source=source) from None
+                raise ConfigError(
+                    f"action: ask_operator: timeout: {e}", source=source
+                ) from None
         return cls(
-            question=as_str(cfg["question"], kind="action: ask_operator", key="question", source=source),
+            question=as_str(
+                cfg["question"],
+                kind="action: ask_operator",
+                key="question",
+                source=source,
+            ),
             timeout=timeout,
         )
 
@@ -663,13 +757,24 @@ class AskOperatorAction(Action):
 
 @dataclass(frozen=True)
 class RunScriptAction(Action):
+    """Run a shell command; a non-zero exit is reported with the script's output.
+
+    That makes a script usable as an ad-hoc health check - the check lives in
+    shell (so it can be site-specific) and only the pass/fail convention is in
+    the supervisor.  Pair with ``quiet: true`` for a check that runs every
+    cycle, so the operator only hears about it when it fails.
+    """
+
     kind: ClassVar[str] = "run_script"
 
     _DEFAULT_TIMEOUT: ClassVar[datetime.timedelta] = datetime.timedelta(minutes=10)
+    #: cap the output pasted into a notification (Telegram truncates ~4k)
+    _MAX_OUTPUT: ClassVar[int] = 1200
 
     path: str
     timeout: datetime.timedelta = _DEFAULT_TIMEOUT
     background: bool = False
+    quiet: bool = False
 
     @classmethod
     def _from_config(cls, cfg: dict, source: str) -> "RunScriptAction":
@@ -677,7 +782,7 @@ class RunScriptAction(Action):
             cfg,
             kind="action: run_script",
             source=source,
-            allowed={"action", "path", "timeout", "background"},
+            allowed={"action", "path", "timeout", "background", "quiet"},
             required={"path"},
         )
         timeout = cls._DEFAULT_TIMEOUT
@@ -692,12 +797,23 @@ class RunScriptAction(Action):
         background = False
         if "background" in cfg:
             background = as_bool(
-                cfg["background"], kind="action: run_script", key="background", source=source
+                cfg["background"],
+                kind="action: run_script",
+                key="background",
+                source=source,
+            )
+        quiet = False
+        if "quiet" in cfg:
+            quiet = as_bool(
+                cfg["quiet"], kind="action: run_script", key="quiet", source=source
             )
         return cls(
-            path=as_str(cfg["path"], kind="action: run_script", key="path", source=source),
+            path=as_str(
+                cfg["path"], kind="action: run_script", key="path", source=source
+            ),
             timeout=timeout,
             background=background,
+            quiet=quiet,
         )
 
     def to_config(self) -> dict:
@@ -706,26 +822,49 @@ class RunScriptAction(Action):
             cfg["timeout"] = format_duration(self.timeout)
         if self.background:
             cfg["background"] = True
+        if self.quiet:
+            cfg["quiet"] = True
         return cfg
 
-    def _run_script(self) -> int:
+    def _run_script(self) -> tuple[int, str]:
         """Run the command in its own process group so a timeout can kill
-        the whole tree, not just the shell.  Returns the exit status."""
-        proc = subprocess.Popen(self.path, shell=True, start_new_session=True)
+        the whole tree, not just the shell.  Returns (exit status, output)
+        with stderr folded into stdout."""
+        proc = subprocess.Popen(
+            self.path,
+            shell=True,
+            start_new_session=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            errors="replace",
+        )
         try:
-            return proc.wait(timeout=self.timeout.total_seconds())
+            output, _ = proc.communicate(timeout=self.timeout.total_seconds())
+            return proc.returncode, output
         except subprocess.TimeoutExpired:
             try:
                 os.killpg(proc.pid, signal.SIGKILL)
             except (ProcessLookupError, PermissionError):
                 proc.kill()
-            proc.wait()
+            proc.communicate()  # drain the pipe so the child is reaped
             raise
+
+    def _failure_message(self, status: int, output: str, what: str = "Script") -> str:
+        """Report the exit status, quoting the tail of the output - for a check
+        script that is the line explaining what is wrong."""
+        message = f"{what} {self.path} exited with status {status}."
+        text = output.strip()
+        if not text:
+            return message
+        if len(text) > self._MAX_OUTPUT:
+            text = "[...]" + text[-self._MAX_OUTPUT :]
+        return f"{message}\n{text}"
 
     def _run_and_report(self, ctx: Context) -> None:
         """Background worker: never raises, only broadcasts the outcome."""
         try:
-            status = self._run_script()
+            status, output = self._run_script()
         except subprocess.TimeoutExpired:
             _broadcast(
                 ctx,
@@ -737,7 +876,9 @@ class RunScriptAction(Action):
             _broadcast(ctx, f"Background script {self.path} failed: {e}")
             return
         if status != 0:
-            _broadcast(ctx, f"Background script {self.path} exited with status {status}.")
+            _broadcast(
+                ctx, self._failure_message(status, output, what="Background script")
+            )
 
     def execute(self, ctx: Context) -> None:
         executable = self.path.split()[0] if self.path.split() else self.path
@@ -745,7 +886,8 @@ class RunScriptAction(Action):
             _broadcast(ctx, f"Could not find script {self.path} to run.")
             raise ActionError(f"script not found: {self.path}")
         if self.background:
-            _broadcast(ctx, f"Running {self.path} in the background...")
+            if not self.quiet:
+                _broadcast(ctx, f"Running {self.path} in the background...")
             threading.Thread(
                 target=self._run_and_report,
                 args=(ctx,),
@@ -753,9 +895,10 @@ class RunScriptAction(Action):
                 daemon=True,
             ).start()
             return
-        _broadcast(ctx, f"Running {self.path}...")
+        if not self.quiet:
+            _broadcast(ctx, f"Running {self.path}...")
         try:
-            status = self._run_script()
+            status, output = self._run_script()
         except subprocess.TimeoutExpired:
             _broadcast(
                 ctx,
@@ -766,7 +909,7 @@ class RunScriptAction(Action):
                 f"script {self.path} timed out after {format_duration(self.timeout)}"
             ) from None
         if status != 0:
-            _broadcast(ctx, f"Script {self.path} exited with status {status}.")
+            _broadcast(ctx, self._failure_message(status, output))
             raise ActionError(f"script {self.path} exited with status {status}")
 
 
@@ -784,9 +927,19 @@ class SchedulerAction(Action):
     @classmethod
     def _from_config(cls, cfg: dict, source: str) -> "SchedulerAction":
         check_keys(
-            cfg, kind="action: scheduler", source=source, allowed={"action", "do"}, required={"do"}
+            cfg,
+            kind="action: scheduler",
+            source=source,
+            allowed={"action", "do"},
+            required={"do"},
         )
-        do = as_choice(cfg["do"], {"start", "stop"}, kind="action: scheduler", key="do", source=source)
+        do = as_choice(
+            cfg["do"],
+            {"start", "stop"},
+            kind="action: scheduler",
+            key="do",
+            source=source,
+        )
         return cls(do=do)
 
     def to_config(self) -> dict:
@@ -813,10 +966,18 @@ class RobObsAction(Action):
     @classmethod
     def _from_config(cls, cfg: dict, source: str) -> "RobObsAction":
         check_keys(
-            cfg, kind="action: robobs", source=source, allowed={"action", "do"}, required={"do"}
+            cfg,
+            kind="action: robobs",
+            source=source,
+            allowed={"action", "do"},
+            required={"do"},
         )
         do = as_choice(
-            cfg["do"], {"start", "stop", "wake"}, kind="action: robobs", key="do", source=source
+            cfg["do"],
+            {"start", "stop", "wake"},
+            kind="action: robobs",
+            key="do",
+            source=source,
         )
         return cls(do=do)
 
@@ -828,6 +989,25 @@ class RobObsAction(Action):
             if robobs is None:
                 continue
             if self.do == "start":
+                # Never start the night while the dome or the site is
+                # locked: a manual `run RobobsStart` executes responses
+                # without the checklist's conditions, and on 2026-07-22 it
+                # started the whole queue against a closed, operator-locked
+                # dome - autofocus on shut-dome darkness, science slews to
+                # nowhere. The locks are somebody's explicit "do not open";
+                # starting the robot must respect them from every path.
+                locked = [
+                    name
+                    for name in ("dome", "site")
+                    if ctx.flags.get_flag(name) == Flag.LOCK
+                ]
+                if locked:
+                    _broadcast(
+                        ctx,
+                        f"NOT starting robobs: {', '.join(locked)} locked "
+                        f"(release the lock first).",
+                    )
+                    return
                 ctx.flags.set_flag("robobs", Flag.OPERATING)
                 _broadcast(ctx, "Starting robobs and waking it up.")
                 robobs.start()
@@ -909,7 +1089,14 @@ class ConfigureSchedulerAction(Action):
             allowed={"action", "file"},
             required={"file"},
         )
-        return cls(file=as_str(cfg["file"], kind="action: configure_scheduler", key="file", source=source))
+        return cls(
+            file=as_str(
+                cfg["file"],
+                kind="action: configure_scheduler",
+                key="file",
+                source=source,
+            )
+        )
 
     def to_config(self) -> dict:
         return {"action": self.kind, "file": self.file}
@@ -923,7 +1110,9 @@ class ConfigureSchedulerAction(Action):
                 ctx.flags.set_flag("scheduler", Flag.ERROR)
             except Exception:
                 pass
-            raise ActionError(f"could not configure scheduler from {self.file}: {e}") from e
+            raise ActionError(
+                f"could not configure scheduler from {self.file}: {e}"
+            ) from e
         ctx.flags.set_flag("scheduler", Flag.READY)
         _broadcast(
             ctx,
@@ -990,7 +1179,9 @@ def _load_scheduler_programs(filename: str) -> int:
                         actconfig["ra"], actconfig["dec"], epoch
                     )
                 elif {"alt", "az"} <= set(actconfig):
-                    act.target_alt_az = Position.from_alt_az(actconfig["alt"], actconfig["az"])
+                    act.target_alt_az = Position.from_alt_az(
+                        actconfig["alt"], actconfig["az"]
+                    )
                 elif "name" in actconfig:
                     act.target_name = actconfig["name"]
                 elif not ({"offset", "dome_az", "dome_tracking"} & set(actconfig)):

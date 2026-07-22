@@ -213,9 +213,54 @@ def test_run_script_background_reports_failure(tmp_path):
     assert any("status 3" in m for m in ctx.notifier.messages)
 
 
+def test_run_script_failure_reports_output(tmp_path):
+    """A check script's own message is what tells the operator what is wrong."""
+    ctx = make_context()
+    bad = tmp_path / "check.sh"
+    bad.write_text("#!/bin/sh\necho 'clock is NOT on the GPS reference' >&2\nexit 1\n")
+    bad.chmod(0o755)
+    with pytest.raises(ActionError):
+        run({"action": "run_script", "path": str(bad)}, ctx)
+    assert any("clock is NOT on the GPS reference" in m for m in ctx.notifier.messages)
+
+
+def test_run_script_quiet_only_speaks_on_failure(tmp_path):
+    ctx = make_context()
+    ok = tmp_path / "ok.sh"
+    ok.write_text("#!/bin/sh\necho fine\nexit 0\n")
+    ok.chmod(0o755)
+    run({"action": "run_script", "path": str(ok), "quiet": True}, ctx)
+    assert ctx.notifier.messages == []  # nothing at all on a passing check
+
+    bad = tmp_path / "bad.sh"
+    bad.write_text("#!/bin/sh\necho broken\nexit 2\n")
+    bad.chmod(0o755)
+    with pytest.raises(ActionError):
+        run({"action": "run_script", "path": str(bad), "quiet": True}, ctx)
+    assert any("broken" in m and "status 2" in m for m in ctx.notifier.messages)
+
+
+def test_run_script_output_is_truncated(tmp_path):
+    ctx = make_context()
+    noisy = tmp_path / "noisy.sh"
+    noisy.write_text("#!/bin/sh\nyes abcdefgh | head -2000\nexit 1\n")
+    noisy.chmod(0o755)
+    with pytest.raises(ActionError):
+        run({"action": "run_script", "path": str(noisy), "quiet": True}, ctx)
+    (message,) = [m for m in ctx.notifier.messages if "status 1" in m]
+    assert "[...]" in message
+    assert len(message) < 1500  # tail only, keeps notifications sane
+
+
 def test_run_script_config_roundtrip():
     action = parse_action(
-        {"action": "run_script", "path": "/x.sh", "timeout": "5m", "background": True},
+        {
+            "action": "run_script",
+            "path": "/x.sh",
+            "timeout": "5m",
+            "background": True,
+            "quiet": True,
+        },
         "test",
     )
     assert action.to_config() == {
@@ -223,9 +268,12 @@ def test_run_script_config_roundtrip():
         "path": "/x.sh",
         "timeout": "5m",
         "background": True,
+        "quiet": True,
     }
     # defaults stay out of the config (legacy converter emits the bare form)
-    assert parse_action({"action": "run_script", "path": "/x.sh"}, "test").to_config() == {
+    assert parse_action(
+        {"action": "run_script", "path": "/x.sh"}, "test"
+    ).to_config() == {
         "action": "run_script",
         "path": "/x.sh",
     }
@@ -276,4 +324,33 @@ def test_unknown_action_and_bad_keys():
     with pytest.raises(ConfigError):
         parse_action({"action": "dome", "do": "slew"}, "test")  # missing azimuth
     with pytest.raises(ConfigError):
-        parse_action({"action": "fan", "do": "switch_off", "fan": "/f", "speed": 1}, "test")
+        parse_action(
+            {"action": "fan", "do": "switch_off", "fan": "/f", "speed": 1}, "test"
+        )
+
+
+def test_robobs_start_refuses_while_dome_locked():
+    """A locked dome or site is somebody's explicit "do not open".
+
+    `run RobobsStart` executes responses without the checklist's
+    conditions, and on 2026-07-22 it started the whole night against a
+    closed, operator-locked dome - autofocus on shut-dome darkness and
+    science slews to nowhere. The action itself must respect the locks.
+    """
+    ctx = make_context()
+    ctx.flags.lock("dome", "operator")
+    run({"action": "robobs", "do": "start"}, ctx)
+    assert ctx.robobs[0].calls == [], "robobs started against a locked dome"
+    assert ctx.flags.get_flag("robobs") != Flag.OPERATING
+    assert any("NOT starting robobs" in m for m in ctx.notifier.messages)
+
+    # site lock refuses too
+    ctx2 = make_context()
+    ctx2.flags.lock("site", "transparency")
+    run({"action": "robobs", "do": "start"}, ctx2)
+    assert ctx2.robobs[0].calls == []
+
+    # released: starts normally
+    ctx.flags.unlock("dome", "operator")
+    run({"action": "robobs", "do": "start"}, ctx)
+    assert ctx.robobs[0].calls == ["start", "wake"]
