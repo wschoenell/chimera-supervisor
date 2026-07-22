@@ -173,6 +173,20 @@ Actions
 
     - action: run_script
       path: /path/to/script.sh   # non-zero exit status counts as failure
+      timeout: 10m               # default 10m; the process group is killed
+      background: true           # don't block the cycle; outcome is broadcast
+      quiet: true                # only notify on failure
+
+On a non-zero exit the script's output (stdout and stderr, tail-truncated) is
+broadcast along with the status, so a script can be used as an ad-hoc health
+check: put the logic in shell, print the reason, ``exit 1``.  Use
+``quiet: true`` for a check that runs every cycle so the operator only hears
+about it when it actually fails::
+
+    - action: run_script
+      path: /home/astro/bin/check-gps-time.sh
+      timeout: 30s
+      quiet: true
 
 ``scheduler`` / ``robobs`` / ``stop_all`` / ``configure_scheduler``::
 

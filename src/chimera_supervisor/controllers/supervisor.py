@@ -34,7 +34,15 @@ from chimera_supervisor.persistence.state import StateStore
 ON_SCHEDULER_ERROR = "on_scheduler_error"
 ON_OBJECT_TOO_LOW = "on_object_too_low"
 
-_ROLES = ("site", "telescope", "camera", "dome", "scheduler", "robobs", "weatherstations")
+_ROLES = (
+    "site",
+    "telescope",
+    "camera",
+    "dome",
+    "scheduler",
+    "robobs",
+    "weatherstations",
+)
 
 
 class Supervisor(ChimeraObject):
@@ -92,7 +100,9 @@ class Supervisor(ChimeraObject):
         for role in _ROLES:
             if self[role] is None:
                 continue
-            locations = [loc.strip() for loc in str(self[role]).split(",") if loc.strip()]
+            locations = [
+                loc.strip() for loc in str(self[role]).split(",") if loc.strip()
+            ]
             self._locations[role] = locations
             for name in self._flag_names(role):
                 self.store.register_instrument(name)
@@ -110,7 +120,9 @@ class Supervisor(ChimeraObject):
                 item_status_changed=lambda item, status: self.item_status_changed(
                     item.name, status
                 ),
-                response_begin=lambda item, resp: self.item_response_begin(item.name, resp.kind),
+                response_begin=lambda item, resp: self.item_response_begin(
+                    item.name, resp.kind
+                ),
                 response_complete=lambda item, resp, ok: self.item_response_complete(
                     item.name, resp.kind, ok
                 ),
@@ -189,14 +201,20 @@ class Supervisor(ChimeraObject):
     def _setup_notifier(self):
         token = self["telegram_token"]
         if token is None:
-            self.log.info("no telegram_token configured; notifications go to the log only")
+            self.log.info(
+                "no telegram_token configured; notifications go to the log only"
+            )
             self.notifier = NullNotifier(self.log)
             return
         from chimera_supervisor.telegrambot import TelegramNotifier
 
         def _ids(key):
             raw = self[key]
-            return [int(part) for part in str(raw).split(",") if part.strip()] if raw else []
+            return (
+                [int(part) for part in str(raw).split(",") if part.strip()]
+                if raw
+                else []
+            )
 
         self.notifier = TelegramNotifier(
             token=str(token),
@@ -367,7 +385,7 @@ class Supervisor(ChimeraObject):
         except Exception as e:
             self.log.warning("could not set %s flag to %s: %s", instrument, flag, e)
 
-    def _watch_slew_begin(self, target):
+    def _watch_slew_begin(self, ra, dec, epoch):
         self._set_flag_safe("telescope", Flag.OPERATING)
 
     def _run_hook(self, name: str):
@@ -378,10 +396,14 @@ class Supervisor(ChimeraObject):
             target=self.run_action, args=(name,), name=f"hook-{name}", daemon=True
         ).start()
 
-    def _watch_tracking_stopped(self, position, status):
+    def _watch_tracking_stopped(self, status):
+        # deliberately not broadcast: the scheduler stops tracking at the end of
+        # every program, so this fires many times a night with status OK and is
+        # noise on telegram. Abnormal stops are still handled by the hook below.
         self._set_flag_safe("telescope", Flag.READY)
-        self.notifier.broadcast(f"Telescope tracking stopped with status {status}.")
-        if status == TelescopeStatus.OBJECT_TOO_LOW and self.engine.item(ON_OBJECT_TOO_LOW):
+        if status == TelescopeStatus.OBJECT_TOO_LOW and self.engine.item(
+            ON_OBJECT_TOO_LOW
+        ):
             # site policy hook: define an item with this name to react
             self._run_hook(ON_OBJECT_TOO_LOW)
 
