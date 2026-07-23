@@ -10,6 +10,7 @@ chimera proxies.
 """
 
 import datetime
+import logging
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
@@ -67,6 +68,12 @@ class Context:
 
     flags: FlagBoard | None = None
     notifier: Notifier | None = None
+
+    #: diagnostic log; the controller passes its own logger so action output
+    #: lands in supervisor.log (never the operator notifier / Telegram).
+    log: logging.Logger = field(
+        default_factory=lambda: logging.getLogger("chimera_supervisor.checklist")
+    )
 
     #: measurements older than this are considered stale
     max_weather_age: datetime.timedelta = datetime.timedelta(minutes=10)

@@ -257,6 +257,7 @@ class Supervisor(ChimeraObject):
             robobs=self._proxies("robobs"),
             flags=self.store,
             notifier=self.notifier,
+            log=self.log,
             max_weather_age=datetime.timedelta(minutes=float(self["max_weather_age"])),
             resolve=self.get_proxy,
             run_action=self.run_action,

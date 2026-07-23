@@ -17,6 +17,7 @@ engine can apply the item's ``on_error`` policy.
 
 import abc
 import datetime
+import logging
 import os
 import signal
 import subprocess
@@ -770,6 +771,8 @@ class RunScriptAction(Action):
     _DEFAULT_TIMEOUT: ClassVar[datetime.timedelta] = datetime.timedelta(minutes=10)
     #: cap the output pasted into a notification (Telegram truncates ~4k)
     _MAX_OUTPUT: ClassVar[int] = 1200
+    #: a log line can hold more than a notification; still bound pathological output
+    _MAX_LOG_OUTPUT: ClassVar[int] = 4000
 
     path: str
     timeout: datetime.timedelta = _DEFAULT_TIMEOUT
@@ -850,16 +853,29 @@ class RunScriptAction(Action):
             proc.communicate()  # drain the pipe so the child is reaped
             raise
 
+    @staticmethod
+    def _tail(text: str, limit: int) -> str:
+        text = text.strip()
+        if len(text) > limit:
+            return "[...]" + text[-limit:]
+        return text
+
     def _failure_message(self, status: int, output: str, what: str = "Script") -> str:
         """Report the exit status, quoting the tail of the output - for a check
         script that is the line explaining what is wrong."""
         message = f"{what} {self.path} exited with status {status}."
-        text = output.strip()
+        text = self._tail(output, self._MAX_OUTPUT)
+        return f"{message}\n{text}" if text else message
+
+    def _log_output(self, ctx: Context, status: int, output: str) -> None:
+        """Record the script's output in supervisor.log (never the notifier),
+        so a ``quiet`` periodic check still leaves a verifiable trail - e.g. a
+        health check can print its measurement and it is kept for later."""
+        text = self._tail(output, self._MAX_LOG_OUTPUT)
         if not text:
-            return message
-        if len(text) > self._MAX_OUTPUT:
-            text = "[...]" + text[-self._MAX_OUTPUT :]
-        return f"{message}\n{text}"
+            return
+        level = logging.INFO if status == 0 else logging.WARNING
+        ctx.log.log(level, "run_script %s exited %d; output:\n%s", self.path, status, text)
 
     def _run_and_report(self, ctx: Context) -> None:
         """Background worker: never raises, only broadcasts the outcome."""
@@ -875,6 +891,7 @@ class RunScriptAction(Action):
         except Exception as e:
             _broadcast(ctx, f"Background script {self.path} failed: {e}")
             return
+        self._log_output(ctx, status, output)
         if status != 0:
             _broadcast(
                 ctx, self._failure_message(status, output, what="Background script")
@@ -908,6 +925,7 @@ class RunScriptAction(Action):
             raise ActionError(
                 f"script {self.path} timed out after {format_duration(self.timeout)}"
             ) from None
+        self._log_output(ctx, status, output)
         if status != 0:
             _broadcast(ctx, self._failure_message(status, output))
             raise ActionError(f"script {self.path} exited with status {status}")

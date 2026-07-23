@@ -240,6 +240,22 @@ def test_run_script_quiet_only_speaks_on_failure(tmp_path):
     assert any("broken" in m and "status 2" in m for m in ctx.notifier.messages)
 
 
+def test_run_script_logs_output_on_success_without_broadcasting(tmp_path, caplog):
+    """Happy-path output is recorded in the log (verifiable later) but never
+    sent to the operator/Telegram - this is what the GPS check relies on."""
+    import logging
+
+    ctx = make_context()
+    ok = tmp_path / "check.sh"
+    ok.write_text("#!/bin/sh\necho 'MBG,stratum 1,offset 3e-06s'\nexit 0\n")
+    ok.chmod(0o755)
+    with caplog.at_level(logging.INFO, logger="chimera_supervisor.checklist"):
+        run({"action": "run_script", "path": str(ok), "quiet": True}, ctx)
+    assert ctx.notifier.messages == []  # nothing to the operator
+    assert "MBG,stratum 1,offset 3e-06s" in caplog.text  # but kept in the log
+    assert any(r.levelno == logging.INFO for r in caplog.records)
+
+
 def test_run_script_output_is_truncated(tmp_path):
     ctx = make_context()
     noisy = tmp_path / "noisy.sh"
