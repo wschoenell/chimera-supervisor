@@ -306,3 +306,41 @@ def test_morning_reference_is_not_rolled_back():
     ctx = make_context(site=_AfternoonSite())
     result = evaluate({"condition": "time", "after": "sunrise"}, ctx)
     assert not result.passed, result.message
+
+
+class _EveningSite(FakeSite):
+    """22:20 UT, night just started: the site resolves sunrise from today's
+    midnight, i.e. THIS MORNING's - 13 h stale."""
+
+    def __init__(self):
+        super().__init__(ut=datetime.datetime(2026, 7, 23, 22, 20))
+        self.sunset_time = datetime.datetime(2026, 7, 23, 20, 38)
+        self.sunrise_time = datetime.datetime(2026, 7, 23, 9, 39)
+
+
+def test_morning_reference_rolls_forward_in_the_evening():
+    """`before: sunrise_twilight_begin` must be true for the night under
+    way: the reference resolves to this MORNING's sunrise all evening, so
+    start_robobs could never fire after dusk (2026-07-23 - the whole night
+    needed manual starts)."""
+    ctx = make_context(site=_EveningSite())
+    for reference in ("sunrise", "sunrise_twilight_begin"):
+        result = evaluate({"condition": "time", "before": reference}, ctx)
+        assert result.passed, f"{reference}: {result.message}"
+    # and the mirror stop-item guard: "after this morning's sunrise + 1h"
+    # must NOT be true anymore once the reference rolls to tomorrow
+    result = evaluate(
+        {"condition": "time", "after": "sunrise_twilight_begin", "offset": "1h"}, ctx
+    )
+    assert not result.passed, result.message
+
+
+def test_morning_reference_stays_latched_through_the_afternoon():
+    """Within 12 h of this morning's event the reference must NOT roll:
+    lock_dome_on_sunrise stays latched through the day."""
+    ctx = make_context(
+        site=FakeSite(ut=datetime.datetime(2026, 7, 23, 15, 0))
+    )
+    ctx.site.sunrise_time = datetime.datetime(2026, 7, 23, 9, 39)
+    result = evaluate({"condition": "time", "after": "sunrise"}, ctx)
+    assert result.passed, result.message

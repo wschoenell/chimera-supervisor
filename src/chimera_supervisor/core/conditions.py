@@ -199,6 +199,17 @@ class TimeCondition(Condition):
             hours=12
         ):
             reference -= datetime.timedelta(days=1)
+        # The mirror wrap: MORNING references resolve from today's midnight,
+        # so for the whole evening the "coming" sunrise is this MORNING's -
+        # 14 h stale - and `before: sunrise_twilight_begin` is false for the
+        # night just starting (2026-07-23: start_robobs could never fire
+        # after dusk). Once this morning's event is >12 h behind, the night
+        # under way runs toward tomorrow's: roll it forward. The afternoon
+        # (<12 h) keeps today's, so lock_dome_on_sunrise stays latched.
+        if self.reference.startswith("sunrise") and now - reference > datetime.timedelta(
+            hours=12
+        ):
+            reference += datetime.timedelta(days=1)
         return reference
 
     def evaluate(self, ctx: Context, memory: MemorySlot) -> Result:
