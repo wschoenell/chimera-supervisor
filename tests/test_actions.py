@@ -308,6 +308,18 @@ def test_stop_all_stops_everything_despite_errors():
     assert not ctx.telescopes[0].tracking
 
 
+def test_stop_all_marks_robobs_ready():
+    """stop_all must reset the robobs flag like the plain stop action does.
+    Left at "operating" after an operator_lock it blocked make_queue and
+    start_robobs for the whole next day (2026-07-23: no plan until the flag
+    was cleared by hand 25 minutes before the window closed)."""
+    ctx = make_context()
+    ctx.flags.set_flag("robobs", Flag.OPERATING)
+    run({"action": "stop_all"}, ctx)
+    assert ctx.robobs[0].calls == ["stop"]
+    assert ctx.flags.get_flag("robobs") == Flag.READY
+
+
 def test_ask_operator_action_broadcasts_answer():
     ctx = make_context()
     ctx.notifier.answers = ["yes"]

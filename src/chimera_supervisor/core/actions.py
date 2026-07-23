@@ -1049,6 +1049,11 @@ class StopAllAction(Action):
                 if robobs is not None:
                     robobs.stop()
             if ctx.robobs:
+                # the flag must follow the stop (as the plain robobs-stop
+                # action does): left at "operating" it blocked make_queue
+                # and start_robobs for the whole next day after an
+                # operator_lock (2026-07-23)
+                ctx.flags.set_flag("robobs", Flag.READY)
                 _broadcast(ctx, "Robobs stopped.")
         except Exception as e:
             _broadcast(ctx, f"Error trying to stop robobs: {e}")
