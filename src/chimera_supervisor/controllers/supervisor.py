@@ -59,7 +59,7 @@ class Supervisor(ChimeraObject):
         # runtime state (flags, lock keys, item status)
         "state_db": os.path.join(SYSTEM_CONFIG_DIRECTORY, "supervisor_state.db"),
         "telegram_token": None,
-        "telegram_broadcast_ids": None,  # comma-separated chat ids
+        "telegram_broadcast_ids": None,  # chat ids: YAML list or comma-separated
         "telegram_listen_ids": None,  # chat ids allowed to answer questions
         "freq": 0.01,  # checklist frequency (Hz)
         "max_weather_age": 10.0,  # minutes before weather data is stale
@@ -210,11 +210,10 @@ class Supervisor(ChimeraObject):
 
         def _ids(key):
             raw = self[key]
-            return (
-                [int(part) for part in str(raw).split(",") if part.strip()]
-                if raw
-                else []
-            )
+            if not raw:
+                return []
+            parts = raw if isinstance(raw, list | tuple) else str(raw).split(",")
+            return [int(str(part).strip()) for part in parts if str(part).strip()]
 
         self.notifier = TelegramNotifier(
             token=str(token),
