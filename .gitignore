@@ -47,6 +47,9 @@ doc.pdf
 .noseids
 .history
 .venv/
+
+# local working copy of the T80S production checklists (see tests/test_legacy.py)
+/supervisor/
 __pycache__/
 *.egg-info/
 .pytest_cache/

@@ -1,5 +1,5 @@
 # Daily open/close cycle, adapted from the T80S production checklists for
-# the fake-hardware soak test (see ../MIGRATION.md).
+# the fake-hardware soak test (see ../README.md).
 checklist:
   unlock_sunup_at_dusk:
     # ADDED (not in T80S): the morning close locks the dome with key

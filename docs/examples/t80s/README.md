@@ -5,11 +5,45 @@ in production at the T80-South telescope, converted from the legacy 1.x
 (mode-number) format to the 2.0 human-readable format.
 
 All 33 production files parse and convert cleanly with `chimera-supervisor
-migrate` (faithful, file-by-file conversions live in `migrated/`; one
-embedded webcam credential was stripped for publication). This document
-describes what each file does, judges what is worth carrying into the new
-format, and defines the curated, **fake-hardware-adapted** set in
-`server-testset/` used for the long-term test deployment.
+migrate` — the test suite (`tests/test_legacy.py`) runs the whole corpus
+through the converter and asserts every check/response round-trips. This
+document describes what each file does, judges what is worth carrying into
+the new format, and defines the curated, **fake-hardware-adapted** set in
+`checklist/` used for the long-term test deployment.
+
+The conversion is mechanical. For example, `manager_lockall.yaml`'s wind
+watchdog goes from numeric modes:
+
+```yaml
+# legacy 1.x
+- name: CloseOnWind
+  check:
+    - {type: CheckWindSpeed, windspeed: 16.0}
+    - {type: CheckInstrumentFlag, instrument: dome, flag: wind, mode: 3}
+  responses:
+    - {type: StopAll}
+    - {type: TelescopeAction, mode: 3}        # close cover
+    - {type: DomeAction, mode: 1}             # close slit
+    - {type: LockInstrument, instrument: dome, key: wind}
+```
+
+to the human-readable 2.0 form (`chimera-supervisor migrate manager_lockall.yaml`):
+
+```yaml
+# 2.0
+CloseOnWind:
+  conditions:
+    - {condition: wind_speed, above: 16.0}
+    - {condition: flag, instrument: dome, not_locked_with_key: wind}
+  responses:
+    - {action: stop_all}
+    - {action: telescope, do: close_cover}
+    - {action: dome, do: close_slit}
+    - {action: lock, instrument: dome, key: wind}
+```
+
+(One embedded webcam credential in the production set was stripped for
+publication.)
 
 "Active" below means the file contains items with `active: true` (they run
 automatically every cycle); "manual" items only run via `/run` or `/list`.
@@ -51,10 +85,10 @@ automatically every cycle); "manual" items only run via `/run` or `/list`.
 | `manager_getAllSky.yaml`, `manager_getInternalImages.yaml`, `manager_getProgress.yaml`, `manager_sendObsPlan.yaml`, `manager_cleanqueuebadweather.yaml` | one each | Fetch LAN webcam/all-sky images, progress plots, clean robobs queue | Skip — LAN cameras, `/mnt/public` scripts, robobs |
 | `manager_OpenAndStartRobObs.yaml`, `update.yaml` | OpenAndStartRoboObs + copies of items above | Robobs night start; `update.yaml` is a grab-bag of items duplicated from other files | Skip — robobs; duplicates |
 
-## The server test set (`server-testset/`)
+## The server test set (`checklist/`)
 
 Curated, deduplicated, adapted to the fake observatory (see
-[`docs/deploy-fake-observatory.md`](../../docs/deploy-fake-observatory.md)).
+[`docs/deploy-fake-observatory.md`](../../deploy-fake-observatory.md)).
 Adaptations, all noted per item in the files:
 
 - fans/lamps → `/FakeFan/fake`, `/FakeLamp/fake`; the several physical fans
@@ -94,7 +128,7 @@ With the fake weather station (humidity = 40·cos(hour·π/12)+60 %, dew point
   `open_telescope`, `power_off`) stay available from Telegram `/list`.
 
 To deploy this set on a fake-observatory test server: copy
-`server-testset/*.yaml` into the supervisor's `checklist_dir`, run
+`checklist/*.yaml` into the supervisor's `checklist_dir`, run
 `chimera-supervisor validate <dir>`, then `chimera-supervisor reload`.
 Bootstrap note: the evening open requires the `site` flag to be `ready`
 (at T80S an operator procedure set it once); set it once with

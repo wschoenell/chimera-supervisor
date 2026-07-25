@@ -112,7 +112,7 @@ Migrating from 1.x
    ~/.chimera/supervisor`` (every numeric mode becomes words; the tool
    refuses anything it cannot map). A complete real-world example — the
    T80-South production set, converted and curated — lives in
-   ``examples/t80s/``.
+   ``docs/examples/t80s/``.
 2. Update the controller config keys: ``telegram-token`` →
    ``telegram_token``, ``telegram-broascast-ids`` →
    ``telegram_broadcast_ids`` (typo fixed), ``telegram-listen-ids`` →
