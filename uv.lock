@@ -142,6 +142,7 @@ dev = [
     { name = "pytest-cover", specifier = ">=3.0.0" },
     { name = "pytest-memray", specifier = ">=1.8.0" },
     { name = "pytest-mock", specifier = ">=3.14.1" },
+    { name = "pytest-timeout", specifier = ">=2.4.0" },
     { name = "ruff", specifier = ">=0.14.4" },
 ]
 docs = [

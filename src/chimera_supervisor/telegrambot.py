@@ -54,6 +54,11 @@ class TelegramNotifier:
                 telegram.ext.CommandHandler(name, self._make_command_handler(name))
             )
         self._app.add_handler(telegram.ext.CallbackQueryHandler(self._on_button))
+        # catch-all last: anything not matched above (/start, plain text) lands
+        # here so new users learn their id and how to request access.
+        self._app.add_handler(
+            telegram.ext.MessageHandler(telegram.ext.filters.ALL, self._on_message)
+        )
 
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(
@@ -208,9 +213,34 @@ class TelegramNotifier:
         )
         return False
 
+    async def _reply_unauthorized(self, update: telegram.Update) -> None:
+        chat = update.effective_chat
+        if chat is None:
+            return
+        try:
+            await self._app.bot.send_message(
+                chat_id=chat.id,
+                text=(
+                    "This bot is restricted to authorized operators.\n"
+                    f"Your Telegram ID is {chat.id}.\n"
+                    "Send this ID to the observatory staff and wait for approval."
+                ),
+            )
+        except Exception:
+            self.log.debug(
+                "could not answer unauthorized chat %s", chat.id, exc_info=True
+            )
+
+    async def _on_message(self, update: telegram.Update, context) -> None:
+        if not self._authorized(update):
+            await self._reply_unauthorized(update)
+
     def _make_command_handler(self, name: str):
         async def handler(update: telegram.Update, context) -> None:
-            if not self._authorized(update) or self._commands is None:
+            if not self._authorized(update):
+                await self._reply_unauthorized(update)
+                return
+            if self._commands is None:
                 return
             reply = await asyncio.to_thread(
                 self._commands.handle, name, list(context.args or [])
