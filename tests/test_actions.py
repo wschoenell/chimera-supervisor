@@ -396,3 +396,49 @@ def test_robobs_start_refuses_while_dome_locked():
     ctx.flags.unlock("dome", "operator")
     run({"action": "robobs", "do": "start"}, ctx)
     assert ctx.robobs[0].calls == ["start", "wake"]
+
+
+def test_stop_all_keeps_going_after_a_failing_robobs():
+    """The docstring promises "it always tries every step", but one `try`
+    around each LOOP meant the first failure skipped the rest of it — and
+    with it the robobs flag reset, reintroducing the stranded-'operating'
+    bug that reset was added to fix."""
+
+    class BrokenRobobs:
+        def stop(self):
+            raise RuntimeError("proxy is wedged")
+
+    ctx = make_context()
+    good = ctx.robobs[0]
+    ctx.robobs = [BrokenRobobs(), good]
+    ctx.flags.set_flag("robobs", Flag.OPERATING)
+
+    run({"action": "stop_all"}, ctx)  # never raises
+
+    assert "stop" in good.calls  # the second controller was still stopped
+    assert ctx.flags.get_flag("robobs") == Flag.READY
+
+
+def test_robobs_stop_sets_the_flag_only_after_a_successful_stop():
+    """Setting READY first left the board claiming READY with robobs still
+    running — the mirror image of the stranded-'operating' bug."""
+
+    class BrokenRobobs:
+        def stop(self):
+            raise RuntimeError("proxy is wedged")
+
+    ctx = make_context()
+    ctx.robobs = [BrokenRobobs()]
+    ctx.flags.set_flag("robobs", Flag.OPERATING)
+
+    with pytest.raises(ActionError, match="could not stop robobs"):
+        run({"action": "robobs", "do": "stop"}, ctx)
+    assert ctx.flags.get_flag("robobs") == Flag.OPERATING
+
+
+def test_run_script_accepts_a_command_on_path():
+    """`path:` is a command line handed to a shell, not a filename: a PATH
+    lookup, a leading assignment or a builtin are all legitimate and none of
+    them exist on disk."""
+    ctx = make_context()
+    run({"action": "run_script", "path": "true", "quiet": True}, ctx)

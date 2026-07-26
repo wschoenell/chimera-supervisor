@@ -61,6 +61,17 @@ def _from_iso(text: str | None) -> datetime.datetime | None:
 
 
 def _utcnow() -> datetime.datetime:
+    """HOST wall-clock UTC — deliberately not the site clock.
+
+    The store mixes two clocks on purpose.  ``update_item`` records the
+    ``now`` the engine passes in, which is ``ctx.utcnow()`` (site time, so a
+    simulated site's checklist timings are self-consistent).  Flag and lock
+    timestamps use this one instead: they are an audit trail of when a real
+    person or a real event touched the board, and must stay meaningful when
+    the site clock is simulated or offset.  The two are therefore NOT
+    comparable under a simulated site; in production they agree to within
+    NTP error.
+    """
     return datetime.datetime.now(datetime.UTC).replace(tzinfo=None)
 
 
@@ -102,12 +113,20 @@ class StateStore:
             )
 
     def get_flag(self, instrument: str) -> Flag:
+        """Current flag of ``instrument``; UNSET when it is not on the board.
+
+        A read never REGISTERS: it used to, so a typo in a checklist
+        (``instrument: dmoe``) silently created a ghost instrument that then
+        showed up in ``/info`` and — because the no-argument ``can_open()``
+        requires every registered instrument to be READY/OPERATING —
+        disabled every open with nothing pointing at the cause.
+        ``register_instrument`` is the only writer.
+        """
         with self._lock:
             row = self._conn.execute(
                 "SELECT flag FROM instrument_flags WHERE instrument = ?", (instrument,)
             ).fetchone()
         if row is None:
-            self.register_instrument(instrument)
             return Flag.UNSET
         return Flag.parse(row[0])
 
@@ -183,15 +202,22 @@ class StateStore:
         return [row[0] for row in rows]
 
     def has_key(self, instrument: str, key: str) -> bool:
-        return self.get_flag(instrument) == Flag.LOCK and key in self.active_keys(instrument)
+        return self.get_flag(instrument) == Flag.LOCK and key in self.active_keys(
+            instrument
+        )
 
     def can_open(self, instrument: str | None = None) -> bool:
         """No instrument given: every registered instrument must be READY or
         OPERATING.  Instrument given: it and the site must be."""
         operational = (Flag.READY, Flag.OPERATING)
         if instrument is None:
-            return all(self.get_flag(name) in operational for name in self.instruments())
-        return self.get_flag(instrument) in operational and self.get_flag("site") in operational
+            return all(
+                self.get_flag(name) in operational for name in self.instruments()
+            )
+        return (
+            self.get_flag(instrument) in operational
+            and self.get_flag("site") in operational
+        )
 
     # ------------------------------------------------------------------
     # checklist item state
@@ -206,11 +232,14 @@ class StateStore:
             return None
         return bool(row[0])
 
-    def item_times(self, name: str) -> tuple[datetime.datetime | None, datetime.datetime | None]:
+    def item_times(
+        self, name: str
+    ) -> tuple[datetime.datetime | None, datetime.datetime | None]:
         """(last_update, last_change)"""
         with self._lock:
             row = self._conn.execute(
-                "SELECT last_update, last_change FROM item_state WHERE name = ?", (name,)
+                "SELECT last_update, last_change FROM item_state WHERE name = ?",
+                (name,),
             ).fetchone()
         if row is None:
             return None, None
@@ -228,7 +257,13 @@ class StateStore:
                 "   last_status = excluded.last_status,"
                 "   last_update = excluded.last_update,"
                 "   last_change = CASE WHEN ? THEN excluded.last_update ELSE last_change END",
-                (name, None if status is None else int(status), stamp, stamp if changed else None, changed),
+                (
+                    name,
+                    None if status is None else int(status),
+                    stamp,
+                    stamp if changed else None,
+                    changed,
+                ),
             )
 
     # ------------------------------------------------------------------
@@ -238,7 +273,8 @@ class StateStore:
     def get_since(self, item: str, index: int) -> datetime.datetime | None:
         with self._lock:
             row = self._conn.execute(
-                "SELECT since FROM condition_state WHERE item = ? AND idx = ?", (item, index)
+                "SELECT since FROM condition_state WHERE item = ? AND idx = ?",
+                (item, index),
             ).fetchone()
         return _from_iso(row[0]) if row else None
 

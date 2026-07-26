@@ -14,10 +14,15 @@ thread so the rest of the supervisor stays synchronous.
 """
 
 import asyncio
+import contextlib
 import datetime
+import ipaddress
 import logging
+import queue
+import socket
 import ssl
 import threading
+import urllib.parse
 import urllib.request
 import uuid
 
@@ -27,6 +32,9 @@ import telegram.ext
 from chimera_supervisor.operator import OperatorCommands, Reply, SupervisorPort
 
 _COMMANDS = ("list", "run", "info", "lock", "unlock", "reload", "help")
+
+#: bound on queued operator broadcasts (drop-oldest beyond this)
+_OUTBOX_SIZE = 200
 
 
 class TelegramNotifier:
@@ -64,6 +72,13 @@ class TelegramNotifier:
         self._thread = threading.Thread(
             target=self._run_loop, name="telegram-bot", daemon=True
         )
+        # broadcasts are queued and delivered off the engine thread, so a
+        # slow or unreachable Telegram can never hold up the safety loop
+        self._outbox: queue.Queue[str] = queue.Queue(maxsize=_OUTBOX_SIZE)
+        self._stopping = threading.Event()
+        self._sender = threading.Thread(
+            target=self._drain_outbox, name="telegram-outbox", daemon=True
+        )
 
     # ------------------------------------------------------------------
     # lifecycle
@@ -71,6 +86,7 @@ class TelegramNotifier:
 
     def start(self) -> None:
         self._thread.start()
+        self._sender.start()
 
     def _run_loop(self) -> None:
         asyncio.set_event_loop(self._loop)
@@ -91,6 +107,9 @@ class TelegramNotifier:
         )
 
     def stop(self) -> None:
+        self._stopping.set()
+        if self._sender.is_alive():
+            self._sender.join(timeout=5)
         if not self._thread.is_alive():
             return
 
@@ -115,33 +134,57 @@ class TelegramNotifier:
     # ------------------------------------------------------------------
 
     def broadcast(self, message: str) -> None:
-        for chat_id in self._broadcast_ids:
+        """Queue a message for the operator chats and return immediately.
+
+        NEVER blocks: this is called from the engine thread inside actions,
+        and it used to wait up to 30 s per chat id.  With three chats and
+        Telegram unreachable a single notify stalled the checklist cycle for
+        90 s — a close-down list that broadcasts at every step could stall
+        for minutes, during exactly the weather that triggered the close.
+        ``ask()`` genuinely needs an answer and keeps its own blocking path.
+        """
+        try:
+            self._outbox.put_nowait(str(message))
+        except queue.Full:
+            # drop the OLDEST: during an outage the newest state of the
+            # observatory is the one worth delivering
+            with contextlib.suppress(queue.Empty):
+                dropped = self._outbox.get_nowait()
+                self.log.warning("telegram outbox full; dropped %r", dropped[:80])
+            with contextlib.suppress(queue.Full):
+                self._outbox.put_nowait(str(message))
+
+    def _drain_outbox(self) -> None:
+        """Deliver queued broadcasts; runs on the bot thread, never the
+        engine's."""
+        while not self._stopping.is_set():
             try:
-                self._submit(
-                    self._app.bot.send_message(chat_id=chat_id, text=str(message))
-                )
-            except Exception:
-                self.log.exception("could not broadcast to %s", chat_id)
+                message = self._outbox.get(timeout=1.0)
+            except queue.Empty:
+                continue
+            for chat_id in self._broadcast_ids:
+                try:
+                    self._submit(
+                        self._app.bot.send_message(chat_id=chat_id, text=message)
+                    )
+                except Exception:
+                    self.log.exception("could not broadcast to %s", chat_id)
 
     def broadcast_photo(self, url: str, message: str = "") -> None:
         # observatory cameras live on the local network, so fetch the image
         # here and upload the bytes (Telegram's servers can't reach the URL).
-        # No certificate verification: these operator-configured feeds
-        # routinely sit behind self-signed certificates.  A plain filesystem
-        # path (e.g. a plot written by a run_script action) is read directly:
-        # urlopen rejects it for lacking a scheme.
         try:
-            if str(url).startswith("/"):
-                with open(str(url), "rb") as fp:
-                    payload = fp.read()
-            else:
-                context = ssl.create_default_context()
-                context.check_hostname = False
-                context.verify_mode = ssl.CERT_NONE
-                with urllib.request.urlopen(
-                    str(url), timeout=30, context=context
-                ) as response:
-                    payload = response.read()
+            payload = self._fetch_photo(str(url))
+        except FileNotFoundError:
+            # a plot that has not been rendered yet is routine, not a fault:
+            # `make_queue` sends last night's plan first, and on a night with
+            # no history that file does not exist - send_photo raised, the
+            # item's on_error aborted, and the plan was built but never
+            # announced (2026-07-22). Fall back to the text.
+            self.log.info("photo %s does not exist (yet); sending text only", url)
+            if message:
+                self.broadcast(message)
+            return
         except Exception:
             self.log.exception("could not fetch photo from %s", url)
             self.broadcast(f"Could not fetch photo from {url}\n{message}")
@@ -156,6 +199,50 @@ class TelegramNotifier:
                 )
             except Exception:
                 self.log.exception("could not send photo to %s", chat_id)
+
+    @staticmethod
+    def _is_private_host(host: str) -> bool:
+        """True for a host that resolves only to private/link-local/loopback
+        addresses — the self-signed observatory feeds this bot exists for."""
+        if not host:
+            return True  # no host at all: a local path
+        try:
+            infos = socket.getaddrinfo(host, None)
+        except OSError:
+            return False
+        addresses = [ipaddress.ip_address(info[4][0]) for info in infos]
+        return bool(addresses) and all(
+            address.is_private or address.is_loopback or address.is_link_local
+            for address in addresses
+        )
+
+    def _fetch_photo(self, url: str) -> bytes:
+        """Read a photo from disk or fetch it over HTTP(S).
+
+        Local paths (absolute, relative or ``file://``) are read directly:
+        urlopen rejects a bare path for lacking a scheme, which is what the
+        locally rendered plots always are.
+        """
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme in ("", "file"):
+            path = urllib.request.url2pathname(parsed.path) if parsed.scheme else url
+            with open(path, "rb") as fp:
+                return fp.read()
+
+        # Certificate verification is bypassed ONLY for hosts on the local
+        # network: it used to be unconditional, so a send_photo pointed at a
+        # public endpoint silently lost TLS authentication too.
+        if parsed.scheme == "https" and self._is_private_host(parsed.hostname or ""):
+            context = ssl.create_default_context()
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+            self.log.debug(
+                "photo host %s is private: TLS not verified", parsed.hostname
+            )
+        else:
+            context = None
+        with urllib.request.urlopen(url, timeout=30, context=context) as response:
+            return response.read()
 
     def ask(self, question: str, timeout: datetime.timedelta) -> str:
         """Ask the listeners a yes/no question with inline buttons; the first

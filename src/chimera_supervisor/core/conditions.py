@@ -112,6 +112,16 @@ class Condition(abc.ABC):
     @abc.abstractmethod
     def evaluate(self, ctx: Context, memory: MemorySlot) -> Result: ...
 
+    def reset(self, memory: MemorySlot) -> None:
+        """Drop any timing state this condition keeps in ``memory``.
+
+        The engine calls this on every condition it SKIPS because an earlier
+        one in the same item already failed.  Stateless conditions do
+        nothing; a ``for:`` condition forgets its streak, so a debounce can
+        never accumulate while the item is gated shut upstream.
+        """
+        return None
+
 
 # --------------------------------------------------------------------------
 # time
@@ -206,9 +216,9 @@ class TimeCondition(Condition):
         # after dusk). Once this morning's event is >12 h behind, the night
         # under way runs toward tomorrow's: roll it forward. The afternoon
         # (<12 h) keeps today's, so lock_dome_on_sunrise stays latched.
-        if self.reference.startswith("sunrise") and now - reference > datetime.timedelta(
-            hours=12
-        ):
+        if self.reference.startswith(
+            "sunrise"
+        ) and now - reference > datetime.timedelta(hours=12):
             reference += datetime.timedelta(days=1)
         return reference
 
@@ -219,11 +229,15 @@ class TimeCondition(Condition):
             passed = now > reference
         else:
             passed = now < reference
-        state = "passed" if now > reference else "still in the future"
+        # word it from the comparison actually performed: describing a
+        # `before:` reference as "still in the future" while the condition
+        # passed read as a contradiction in the operator log and in
+        # check_complete events.
+        state = f"{self.when} it" if passed else f"not {self.when} it yet"
         return Result(
             passed,
             f"reference time {self.reference}{format_duration(self.offset) if self.offset else ''}"
-            f" ({reference}) {state}; now {now}",
+            f" ({reference}): {state}; now {now}",
         )
 
 
@@ -263,7 +277,7 @@ class DomeCondition(Condition):
         return {"condition": self.kind, self.part: self.state}
 
     def evaluate(self, ctx: Context, memory: MemorySlot) -> Result:
-        dome = ctx.domes[0]
+        dome = ctx.require("domes")
         is_open = dome.is_slit_open() if self.part == "slit" else dome.is_flap_open()
         passed = is_open if self.state == "open" else not is_open
         return Result(passed, f"dome {self.part} is {'open' if is_open else 'closed'}")
@@ -326,7 +340,7 @@ class TelescopeCondition(Condition):
         return {"condition": self.kind, "state": self.state}
 
     def evaluate(self, ctx: Context, memory: MemorySlot) -> Result:
-        tel = ctx.telescopes[0]
+        tel = ctx.require("telescopes")
         if self.state in _TELESCOPE_STATES:
             passed = bool(_TELESCOPE_STATES[self.state](tel))
             return Result(passed, f"telescope state check '{self.state}': {passed}")
@@ -358,7 +372,11 @@ def _is_fresh(ws: Any, ctx: Context) -> bool:
     last = _last_measurement(ws)
     if last is None:
         return False
-    now = datetime.datetime.now(datetime.UTC).replace(tzinfo=None)
+    # the SITE clock, like every other time comparison in this module: with
+    # the host clock, a simulated or offset site reads every station
+    # permanently stale, and the fail-safe branches then hold the dome shut
+    # all night (bare thresholds -> True, `for:` thresholds -> False).
+    now = ctx.utcnow()
     return now - last < ctx.max_weather_age
 
 
@@ -532,6 +550,15 @@ class WeatherThresholdCondition(Condition):
             f"{comparison} for {format_duration(elapsed)}"
             f" (< {format_duration(self.duration)})",
         )
+
+    def reset(self, memory: MemorySlot) -> None:
+        # A `for:` behind a failing sibling is never evaluated, so its streak
+        # would keep aging while the item is gated shut and the debounce would
+        # be spent the instant the gate opened (opd-40 2026-07-25: a 30 m
+        # transparency debounce fired ~1 min after the sky went bad, carrying
+        # a 6 h old timestamp). Forget the streak instead.
+        if self.duration is not None:
+            memory.set(None)
 
 
 class HumidityCondition(WeatherThresholdCondition):

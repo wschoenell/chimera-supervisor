@@ -18,7 +18,11 @@ from chimera_supervisor.core.actions import Action
 from chimera_supervisor.core.checklist import ChecklistItem
 from chimera_supervisor.core.conditions import Condition, Result
 from chimera_supervisor.core.context import Context
-from chimera_supervisor.core.exceptions import ActionError, CheckAbortedError
+from chimera_supervisor.core.exceptions import (
+    ActionError,
+    CheckAbortedError,
+    RoleUnavailableError,
+)
 from chimera_supervisor.persistence.state import StateStore
 
 
@@ -58,6 +62,7 @@ class Engine:
     def __post_init__(self) -> None:
         self.items: list[ChecklistItem] = []
         self.must_stop = threading.Event()
+        self._alerted: set[str] = set()
 
     # ------------------------------------------------------------------
 
@@ -68,8 +73,11 @@ class Engine:
             raise ValueError(f"duplicate checklist item names: {sorted(duplicates)}")
         self.items = list(items)
         self.store.prune_items(names)
-        self.log.info("checklist loaded: %d item(s) (%d automatic)",
-                      len(self.items), sum(1 for i in self.items if i.automatic))
+        self.log.info(
+            "checklist loaded: %d item(s) (%d automatic)",
+            len(self.items),
+            sum(1 for i in self.items if i.automatic),
+        )
 
     def item(self, name: str) -> ChecklistItem | None:
         for item in self.items:
@@ -80,7 +88,9 @@ class Engine:
     def manual_items(self) -> list[str]:
         """Items runnable by hand — historically the inactive ones (they are
         the operator-triggered procedures)."""
-        return [item.name for item in self.items if not item.active or not item.automatic]
+        return [
+            item.name for item in self.items if not item.active or not item.automatic
+        ]
 
     # ------------------------------------------------------------------
 
@@ -112,16 +122,39 @@ class Engine:
                 raise CheckAbortedError(f"aborted while checking {item.name!r}")
             self._notify(self.observer.check_begin, item, condition)
             try:
-                result = condition.evaluate(self.ctx, _StoreMemory(self.store, item.name, index))
+                result = condition.evaluate(
+                    self.ctx, _StoreMemory(self.store, item.name, index)
+                )
+            except RoleUnavailableError as e:
+                # never quiet: an unresolved role turns every guard over it
+                # into a False, which DISABLES close-down items instead of
+                # firing them. Say so on the operator channel, not just here.
+                self.log.error("[%s] %s: %s", item.name, condition.kind, e)
+                self._alert(f"[{item.name}] {condition.kind}: {e}")
+                result = Result(False, str(e))
             except Exception as e:
-                self.log.exception("condition %s of %r failed", condition.kind, item.name)
+                self.log.exception(
+                    "condition %s of %r failed", condition.kind, item.name
+                )
                 result = Result(False, f"condition error: {e!r}")
             self._notify(self.observer.check_complete, item, condition, result)
-            self.log.debug("[%s] %s: %s — %s", item.name, condition.kind,
-                           result.passed, result.message)
+            self.log.debug(
+                "[%s] %s: %s — %s",
+                item.name,
+                condition.kind,
+                result.passed,
+                result.message,
+            )
             messages.append(result.message)
             if not result.passed:
                 status = False
+                # short-circuit the VERDICT, but never the timers: everything
+                # after this point is skipped, so give each skipped condition
+                # a chance to drop its timing state (see Condition.reset).
+                for skipped, later in enumerate(
+                    item.conditions[index + 1 :], start=index + 1
+                ):
+                    later.reset(_StoreMemory(self.store, item.name, skipped))
                 break
 
         previous = self.store.item_status(item.name)
@@ -131,8 +164,12 @@ class Engine:
         if changed:
             self._notify(self.observer.item_status_changed, item, status)
         if should_run:
-            self.log.info("[%s] conditions passed (%s); running %d response(s)",
-                          item.name, "; ".join(messages), len(item.responses))
+            self.log.info(
+                "[%s] conditions passed (%s); running %d response(s)",
+                item.name,
+                "; ".join(messages),
+                len(item.responses),
+            )
             self.run_responses(item)
         self.store.update_item(item.name, status, changed=should_run, now=now)
         return status
@@ -147,7 +184,9 @@ class Engine:
             try:
                 response.execute(self.ctx)
             except ActionError as e:
-                self.log.warning("[%s] response %s failed: %s", item.name, response.kind, e)
+                self.log.warning(
+                    "[%s] response %s failed: %s", item.name, response.kind, e
+                )
                 ok = False
             except Exception:
                 self.log.exception("[%s] response %s crashed", item.name, response.kind)
@@ -156,7 +195,9 @@ class Engine:
             if not ok:
                 all_ok = False
                 if item.on_error == "abort":
-                    self.log.info("[%s] on_error: abort — stopping response list", item.name)
+                    self.log.info(
+                        "[%s] on_error: abort — stopping response list", item.name
+                    )
                     break
         return all_ok
 
@@ -177,6 +218,23 @@ class Engine:
         self.must_stop.set()
 
     # ------------------------------------------------------------------
+
+    def _alert(self, message: str) -> None:
+        """Best-effort operator notification for engine-level faults.
+
+        Rate-limited to once per distinct message so a permanently missing
+        role does not broadcast on every cycle.
+        """
+        if message in self._alerted:
+            return
+        self._alerted.add(message)
+        notifier = getattr(self.ctx, "notifier", None)
+        if notifier is None:
+            return
+        try:
+            notifier.broadcast(message)
+        except Exception:
+            self.log.exception("could not broadcast engine alert")
 
     @staticmethod
     def _notify(callback, *args) -> None:

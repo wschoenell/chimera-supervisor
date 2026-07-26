@@ -81,7 +81,9 @@ class ChecklistItem:
 def parse_item(name: str, cfg: object, source: str) -> ChecklistItem:
     where = f"{source}: item {name!r}"
     if not isinstance(cfg, dict):
-        raise ConfigError(f"item {name!r} must be a mapping, got {cfg!r}", source=source)
+        raise ConfigError(
+            f"item {name!r} must be a mapping, got {cfg!r}", source=source
+        )
     check_keys(cfg, kind=f"item {name!r}", source=source, allowed=_ITEM_KEYS)
 
     conditions_cfg = cfg.get("conditions") or []
@@ -96,7 +98,9 @@ def parse_item(name: str, cfg: object, source: str) -> ChecklistItem:
     return ChecklistItem(
         name=name,
         description=str(cfg.get("description", "")),
-        active=as_bool(cfg.get("active", True), kind=f"item {name!r}", key="active", source=source),
+        active=as_bool(
+            cfg.get("active", True), kind=f"item {name!r}", key="active", source=source
+        ),
         run=as_choice(
             cfg.get("run", "on_change"),
             {"on_change", "always"},
@@ -155,11 +159,22 @@ def load_file(path: str | pathlib.Path) -> list[ChecklistItem]:
 
 
 def load_directory(directory: str | pathlib.Path) -> list[ChecklistItem]:
-    """Load every ``*.yaml`` in a directory; item names must be unique."""
+    """Load every ``*.yaml`` / ``*.yml`` in a directory; names must be unique.
+
+    A missing directory is a configuration error, not an empty checklist: it
+    used to glob to nothing and report the cheerful "checklist loaded: 0
+    item(s)", leaving the supervisor running all night doing nothing.
+    """
     directory = pathlib.Path(directory).expanduser()
+    if not directory.is_dir():
+        raise ConfigError(
+            f"checklist directory {str(directory)!r} does not exist "
+            "(nothing would be supervised)"
+        )
     items: list[ChecklistItem] = []
     seen: dict[str, str] = {}
-    for path in sorted(directory.glob("*.yaml")):
+    paths = sorted(set(directory.glob("*.yaml")) | set(directory.glob("*.yml")))
+    for path in paths:
         if path.name.startswith("."):
             continue
         for item in load_file(path):
@@ -177,5 +192,8 @@ def dump_items(items: list[ChecklistItem]) -> str:
     """Render items as a new-format YAML document."""
     body = {item.name: item.to_config() for item in items}
     return yaml.safe_dump(
-        {"checklist": body}, sort_keys=False, default_flow_style=False, allow_unicode=True
+        {"checklist": body},
+        sort_keys=False,
+        default_flow_style=False,
+        allow_unicode=True,
     )

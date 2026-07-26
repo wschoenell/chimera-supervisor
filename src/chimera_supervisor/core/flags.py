@@ -17,7 +17,9 @@ class InstrumentOperationFlag(enum.Enum):
     ERROR = "error"  # in error; condition unknown
 
     @classmethod
-    def parse(cls, value: "str | int | InstrumentOperationFlag") -> "InstrumentOperationFlag":
+    def parse(
+        cls, value: "str | int | InstrumentOperationFlag"
+    ) -> "InstrumentOperationFlag":
         """Accept a flag instance, a name ("ready", case-insensitive) or a
         legacy integer index (the order of the old chimera Enum)."""
         if isinstance(value, cls):
@@ -25,6 +27,12 @@ class InstrumentOperationFlag(enum.Enum):
         if isinstance(value, bool):
             raise ValueError(f"not an instrument flag: {value!r}")
         if isinstance(value, int):
+            # bounds-checked: a negative index silently wrapped (parse(-1)
+            # returned ERROR), and the legacy format does use -1/-2 for the
+            # INVERSE of a mode elsewhere, so a mis-mapped conversion could
+            # land here and be accepted as a perfectly valid flag.
+            if not 0 <= value < len(_LEGACY_FLAG_ORDER):
+                raise ValueError(f"unknown instrument flag: {value!r}")
             return _LEGACY_FLAG_ORDER[value]
         try:
             return cls[str(value).strip().upper()]

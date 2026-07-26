@@ -15,8 +15,15 @@ def store():
     return StateStore(":memory:")
 
 
-def test_unknown_instrument_is_unset(store):
+def test_unknown_instrument_is_unset_and_not_registered(store):
+    """Reading must never create: a typo in a checklist (`instrument: dmoe`)
+    used to register a ghost instrument, which then failed the no-argument
+    can_open() forever with nothing pointing at the cause."""
     assert store.get_flag("dome") == Flag.UNSET
+    assert "dome" not in store.instruments()
+    assert store.can_open() is True  # a ghost would have made this False
+
+    store.register_instrument("dome")
     assert "dome" in store.instruments()
 
 
@@ -186,3 +193,13 @@ def test_volatile_reset_skips_unconfigured_and_locked():
     sup._reset_volatile_flags()  # must not raise on the empty robobs role
 
     assert store.get_flag("scheduler") == Flag.LOCK
+
+
+def test_flag_parse_rejects_out_of_range_integers():
+    """Negative indices used to wrap: parse(-1) returned ERROR. The legacy
+    format uses -1/-2 for the INVERSE of a mode elsewhere, so a mis-mapped
+    conversion could land here and be accepted as a valid flag."""
+    assert Flag.parse(1) == Flag.READY
+    for bad in (-1, -6, 99):
+        with pytest.raises(ValueError, match="unknown instrument flag"):
+            Flag.parse(bad)

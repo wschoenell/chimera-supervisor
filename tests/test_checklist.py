@@ -100,3 +100,18 @@ def test_invalid_yaml_reports_source(tmp_path):
     bad.write_text("checklist: [")
     with pytest.raises(ConfigError, match="bad.yaml"):
         checklist.load_file(bad)
+
+
+def test_missing_directory_is_an_error_not_an_empty_checklist(tmp_path):
+    """A mistyped checklist_dir used to glob to nothing and report
+    "checklist loaded: 0 item(s)" — a supervisor running all night doing
+    nothing, with a number in a log line as the only clue."""
+    with pytest.raises(ConfigError, match="does not exist"):
+        checklist.load_directory(tmp_path / "not-there")
+
+
+def test_load_directory_accepts_yml_too(tmp_path):
+    (tmp_path / "a.yaml").write_text("x:\n  responses:\n    - action: stop_all\n")
+    (tmp_path / "b.yml").write_text("y:\n  responses:\n    - action: stop_all\n")
+    items = checklist.load_directory(tmp_path)
+    assert sorted(item.name for item in items) == ["x", "y"]

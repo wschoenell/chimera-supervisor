@@ -16,13 +16,15 @@ engine can apply the item's ``on_error`` policy.
 """
 
 import abc
+import contextlib
 import datetime
 import logging
 import os
+import shutil
 import signal
 import subprocess
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, ClassVar
 
 from chimera_supervisor.core.context import Context
@@ -109,11 +111,16 @@ def _guarded_open(ctx: Context, instrument: str, is_done, do_open, what: str) ->
     except StatusUpdateError as e:
         _broadcast(ctx, str(e))
         raise
-    except Exception:
-        try:
+    except Exception as e:
+        # best-effort ERROR flag, then report the ORIGINAL failure the same
+        # way the StatusUpdateError branch does. A bare `raise` inside a
+        # `finally` would be re-entered by a second exception from set_flag
+        # itself (entirely possible: it raises on a locked instrument, and
+        # we are already on a failure path).
+        with contextlib.suppress(Exception):
             ctx.flags.set_flag(instrument, Flag.ERROR)
-        finally:
-            raise
+        _broadcast(ctx, f"Cannot {what}: {e}")
+        raise ActionError(f"cannot {what}: {e}") from e
     if not is_done():
         do_open()
 
@@ -783,6 +790,15 @@ class RunScriptAction(Action):
     background: bool = False
     quiet: bool = False
 
+    #: mutable per-instance bookkeeping for background runs (this is a frozen
+    #: dataclass, so the state lives inside a field instead of on self);
+    #: excluded from equality and repr so the config round-trip is unaffected
+    _state: dict = field(
+        default_factory=lambda: {"lock": threading.Lock(), "thread": None},
+        compare=False,
+        repr=False,
+    )
+
     @classmethod
     def _from_config(cls, cfg: dict, source: str) -> "RunScriptAction":
         check_keys(
@@ -905,18 +921,43 @@ class RunScriptAction(Action):
 
     def execute(self, ctx: Context) -> None:
         executable = self.path.split()[0] if self.path.split() else self.path
-        if not os.path.exists(executable):
+        # self.path is a COMMAND LINE handed to a shell, not a filename: a
+        # PATH lookup (`systemctl is-active chimera`), a leading assignment
+        # (`PGPASSWORD=x psql ...`) or a builtin (`cd /srv && ./check.sh`)
+        # are all legitimate and none of them exist on disk. Only refuse
+        # when the first token looks like a path AND is missing.
+        looks_like_path = os.sep in executable or executable.startswith(".")
+        if looks_like_path and not os.path.exists(executable):
             _broadcast(ctx, f"Could not find script {self.path} to run.")
             raise ActionError(f"script not found: {self.path}")
+        if not looks_like_path and shutil.which(executable) is None:
+            ctx.log.debug(
+                "run_script: %r is not on PATH; letting the shell report it",
+                executable,
+            )
         if self.background:
+            with self._state["lock"]:
+                previous = self._state["thread"]
+                if previous is not None and previous.is_alive():
+                    # `background: true` on a `run: always` item started a new
+                    # detached process EVERY cycle with no cap - one per freq
+                    # tick, forever, whether or not the last one had finished.
+                    ctx.log.warning(
+                        "run_script: previous background run of %r still "
+                        "going; skipping this one",
+                        self.path,
+                    )
+                    return
+                thread = threading.Thread(
+                    target=self._run_and_report,
+                    args=(ctx,),
+                    name=f"run_script:{executable}",
+                    daemon=True,
+                )
+                self._state["thread"] = thread
             if not self.quiet:
                 _broadcast(ctx, f"Running {self.path} in the background...")
-            threading.Thread(
-                target=self._run_and_report,
-                args=(ctx,),
-                name=f"run_script:{executable}",
-                daemon=True,
-            ).start()
+            thread.start()
             return
         if not self.quiet:
             _broadcast(ctx, f"Running {self.path}...")
@@ -1009,9 +1050,13 @@ class RobObsAction(Action):
         return {"action": self.kind, "do": self.do}
 
     def execute(self, ctx: Context) -> None:
-        for robobs in ctx.robobs:
-            if robobs is None:
-                continue
+        controllers = [robobs for robobs in ctx.robobs if robobs is not None]
+        if not controllers:
+            raise ActionError("no robobs controller configured")
+        # `robobs:` accepts comma-separated locations exactly like
+        # `scheduler:`, and SchedulerAction fans out over all of them - this
+        # one used to `return` inside the loop and only ever touch the first.
+        for robobs in controllers:
             if self.do == "start":
                 # Never start the night while the dome or the site is
                 # locked: a manual `run RobobsStart` executes responses
@@ -1034,16 +1079,29 @@ class RobObsAction(Action):
                     return
                 ctx.flags.set_flag("robobs", Flag.OPERATING)
                 _broadcast(ctx, "Starting robobs and waking it up.")
-                robobs.start()
-                robobs.wake()
+                try:
+                    robobs.start()
+                    robobs.wake()
+                except Exception as e:
+                    with contextlib.suppress(Exception):
+                        ctx.flags.set_flag("robobs", Flag.ERROR)
+                    raise ActionError(f"could not start robobs: {e}") from e
             elif self.do == "stop":
-                ctx.flags.set_flag("robobs", Flag.READY)
                 _broadcast(ctx, "Stopping robobs.")
-                robobs.stop()
+                try:
+                    robobs.stop()
+                except Exception as e:
+                    # the flag follows the stop, never precedes it: set to
+                    # READY first, a failed stop() left the board claiming
+                    # READY with robobs still running - the mirror image of
+                    # the stranded-"operating" bug.
+                    raise ActionError(f"could not stop robobs: {e}") from e
+                ctx.flags.set_flag("robobs", Flag.READY)
             else:
-                robobs.wake()
-            return
-        raise ActionError("no robobs controller configured")
+                try:
+                    robobs.wake()
+                except Exception as e:
+                    raise ActionError(f"could not wake robobs: {e}") from e
 
 
 @dataclass(frozen=True)
@@ -1063,41 +1121,53 @@ class StopAllAction(Action):
         return {"action": self.kind}
 
     def execute(self, ctx: Context) -> None:
+        # Every step is individually guarded: with one `try` around each
+        # LOOP, the first instrument that raised skipped the rest of that
+        # loop AND the flag reset after it - with two robobs controllers a
+        # failing stop() on the first left the second running and the flag
+        # stranded at "operating", reintroducing the very bug the reset
+        # below was added to fix.
         try:
             ctx.flags.set_flag("scheduler", Flag.CLOSE)
         except Exception as e:
             _broadcast(ctx, str(e))
 
-        try:
-            for robobs in ctx.robobs:
-                if robobs is not None:
-                    robobs.stop()
-            if ctx.robobs:
-                # the flag must follow the stop (as the plain robobs-stop
-                # action does): left at "operating" it blocked make_queue
-                # and start_robobs for the whole next day after an
-                # operator_lock (2026-07-23)
-                ctx.flags.set_flag("robobs", Flag.READY)
-                _broadcast(ctx, "Robobs stopped.")
-        except Exception as e:
-            _broadcast(ctx, f"Error trying to stop robobs: {e}")
+        if ctx.robobs:
+            try:
+                for robobs in ctx.robobs:
+                    if robobs is None:
+                        continue
+                    try:
+                        robobs.stop()
+                    except Exception as e:
+                        _broadcast(ctx, f"Error trying to stop robobs: {e}")
+            finally:
+                # the flag must follow the stop attempt (as the plain
+                # robobs-stop action does): left at "operating" it blocked
+                # make_queue and start_robobs for the whole next day after
+                # an operator_lock (2026-07-23)
+                try:
+                    ctx.flags.set_flag("robobs", Flag.READY)
+                    _broadcast(ctx, "Robobs stopped.")
+                except Exception as e:
+                    _broadcast(ctx, f"Could not reset the robobs flag: {e}")
 
-        try:
-            for sched in ctx.schedulers:
+        for sched in ctx.schedulers:
+            try:
                 sched.stop()
-            if ctx.schedulers:
-                _broadcast(ctx, "Scheduler stopped.")
-        except Exception as e:
-            _broadcast(ctx, f"Error trying to stop scheduler: {e}")
+            except Exception as e:
+                _broadcast(ctx, f"Error trying to stop scheduler: {e}")
+        if ctx.schedulers:
+            _broadcast(ctx, "Scheduler stopped.")
 
-        try:
-            for tel in ctx.telescopes:
+        for tel in ctx.telescopes:
+            try:
                 if tel.is_tracking():
                     tel.stop_tracking()
-        except NotImplementedError:
-            pass
-        except Exception as e:
-            _broadcast(ctx, str(e))
+            except NotImplementedError:
+                pass
+            except Exception as e:
+                _broadcast(ctx, str(e))
 
 
 @dataclass(frozen=True)
@@ -1160,6 +1230,7 @@ def _load_scheduler_programs(filename: str) -> int:
     from chimera.controllers.scheduler.model import (
         AutoFlat,
         AutoFocus,
+        Autoguide,
         Expose,
         Point,
         PointVerify,
@@ -1169,9 +1240,11 @@ def _load_scheduler_programs(filename: str) -> int:
     from chimera.util.coord import Coord
     from chimera.util.position import Position
 
+    # mirrors chimera's own `action_dict` (cli/sched.py) - keep in step with it
     action_types = {
         "autofocus": AutoFocus,
         "autoflat": AutoFlat,
+        "autoguide": Autoguide,
         "pointverify": PointVerify,
         "point": Point,
         "expose": Expose,
@@ -1186,11 +1259,6 @@ def _load_scheduler_programs(filename: str) -> int:
             return Coord.from_as(int(value))
         except ValueError:
             return Coord.from_dms(value)
-
-    session = Session()
-    for old in session.query(Program).all():
-        session.delete(old)
-    session.commit()
 
     programs = []
     for prg in prgconfig["programs"]:
@@ -1240,6 +1308,18 @@ def _load_scheduler_programs(filename: str) -> int:
             program.actions.append(act)
         programs.append(program)
 
-    session.add_all(programs)
-    session.commit()
+    # Parse FIRST, write second: the queue used to be deleted and committed
+    # before any program was parsed, so a bad action left chimera with an
+    # EMPTY queue mid-night while the action reported failure.
+    session = Session()
+    try:
+        for old in session.query(Program).all():
+            session.delete(old)
+        session.add_all(programs)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
     return len(programs)

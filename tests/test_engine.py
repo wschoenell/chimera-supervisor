@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # SPDX-FileCopyrightText: 2014-present chimera-supervisor authors
 
+import datetime
+
 import yaml
 
 from chimera_supervisor.core import checklist
@@ -186,3 +188,61 @@ def test_condition_crash_counts_as_failed():
     ctx.domes.clear()
     engine.run_cycle()  # must not raise
     assert ctx.flags.item_status("close_on_dew") is False
+
+
+GATED_FOR = """
+close_on_transparency_lock:
+  conditions:
+    - condition: dome
+      slit: open
+    - condition: transparency
+      below: 40
+      for: 30m
+  responses:
+    - action: dome
+      do: close_slit
+"""
+
+
+def advance(ctx, **delta):
+    """Move the site clock (and the stations stamped against it) forward."""
+    later = ctx.site.ut() + datetime.timedelta(**delta)
+    ctx.site._ut = later
+    for station in ctx.weather_stations:
+        station._ut = later
+
+
+def test_for_timer_does_not_accumulate_behind_a_failing_condition():
+    """opd-40 2026-07-25: `close_on_transparency_lock` fired ~1 min after the
+    sky went bad because its `for: 30m` sat behind a flag gate and had not
+    been evaluated - so its `since` was 6 h stale and the debounce was spent
+    the instant the gate opened."""
+    engine, ctx = make_engine(GATED_FOR)
+    dome = ctx.domes[0]
+    ctx.weather_stations[0].values["sky_transparency"] = 33.0
+
+    # an earlier bad-sky episode with the gate OPEN arms the timer
+    dome.slit_open = True
+    engine.run_cycle()
+    assert dome.calls == []
+    assert ctx.flags.get_since("close_on_transparency_lock", 1) is not None
+
+    # then the gate shuts for six hours - the armed timer must not keep aging
+    dome.slit_open = False
+    engine.run_cycle()
+    advance(ctx, hours=6)
+    engine.run_cycle()
+
+    # gate opens again: the debounce starts NOW, it must not already be spent
+    dome.slit_open = True
+    engine.run_cycle()
+    assert dome.calls == []
+
+    # and it still has to run the full 30 m
+    advance(ctx, minutes=29)
+    engine.run_cycle()
+    assert dome.calls == []
+
+    advance(ctx, minutes=2)
+    engine.run_cycle()
+    assert dome.calls == ["close_slit"]

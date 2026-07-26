@@ -26,3 +26,12 @@ class ActionError(SupervisorError):
 
 class StatusUpdateError(SupervisorError):
     """An instrument flag could not be changed (e.g. locked with another key)."""
+
+
+class RoleUnavailableError(SupervisorError):
+    """A checklist referenced an instrument role with no resolved proxy.
+
+    Distinct from a plain failure so the engine can shout about it: a role
+    that silently resolves to nothing turns every guard over it into a
+    False, which disables close-down items rather than triggering them.
+    """

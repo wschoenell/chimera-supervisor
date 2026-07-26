@@ -15,6 +15,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from chimera_supervisor.core.exceptions import RoleUnavailableError
 from chimera_supervisor.core.flags import InstrumentOperationFlag
 
 
@@ -84,6 +85,24 @@ class Context:
     #: run another checklist item's responses by name (used by future
     #: call_action response; also exposed to the CLI/bot)
     run_action: Callable[[str], bool] = lambda name: False
+
+    def require(self, role: str) -> Any:
+        """First proxy of ``role``, or raise ``RoleUnavailableError``.
+
+        An unconfigured or unresolved role used to surface as a bare
+        ``IndexError`` on ``ctx.domes[0]``, which the engine turned into a
+        plain failed condition — fail-OPEN for close-down items (a
+        ``dome, slit: open`` guard reads False with no dome proxy, so the
+        dome is never told to close).  Naming the failure lets the engine
+        log and broadcast it instead of burying it.
+        """
+        instances = getattr(self, role, None) or []
+        if not instances:
+            raise RoleUnavailableError(
+                f"no instrument resolved for role {role!r}: it is either "
+                "unconfigured or its proxy did not resolve at startup"
+            )
+        return instances[0]
 
     def utcnow(self) -> datetime.datetime:
         """Naive-UTC 'now', taken from the site when available so that

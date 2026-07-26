@@ -139,7 +139,9 @@ class FakeTelescope:
 
 
 class FakeWeatherStation:
-    def __init__(self, **values):
+    # measurements are stamped on the SITE clock (UT), like a real station at
+    # a simulated site - freshness is judged with ctx.utcnow()
+    def __init__(self, ut=UT, **values):
         self.values = {
             "humidity": 50.0,
             "temperature": 15.0,
@@ -149,12 +151,12 @@ class FakeWeatherStation:
             **values,
         }
         self.stale = False
+        self._ut = ut
 
     def get_last_measurement_time(self):
-        now = datetime.datetime.now(datetime.UTC).replace(tzinfo=None)
         if self.stale:
-            return (now - datetime.timedelta(hours=2)).isoformat()
-        return now.isoformat()
+            return (self._ut - datetime.timedelta(hours=2)).isoformat()
+        return self._ut.isoformat()
 
     def humidity(self):
         return self.values["humidity"]

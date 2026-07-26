@@ -128,7 +128,9 @@ def cmd_validate(args) -> int:
         try:
             if checklist.is_legacy_document(doc):
                 items, _, warnings = legacy.convert_file(path)
-                note = f"legacy format, {len(items)} item(s) — convert it with 'migrate'"
+                note = (
+                    f"legacy format, {len(items)} item(s) — convert it with 'migrate'"
+                )
                 for warning in warnings:
                     print(f"      warning: {warning}")
             else:
@@ -164,7 +166,9 @@ def cmd_migrate(args) -> int:
         if outdir:
             destination = outdir / path.name
             destination.write_text(text)
-            print(f"OK    {path} -> {destination} ({len(items)} item(s))", file=sys.stderr)
+            print(
+                f"OK    {path} -> {destination} ({len(items)} item(s))", file=sys.stderr
+            )
         else:
             print(f"# migrated from {path}")
             print(text)
@@ -208,8 +212,11 @@ def _online(args, call) -> int:
         bus, proxy = _proxy(args)
         return call(proxy) or 0
     except Exception as e:
-        print(f"error: could not talk to the supervisor at "
-              f"{args.host}:{args.port}{args.supervisor}: {e}", file=sys.stderr)
+        print(
+            f"error: could not talk to the supervisor at "
+            f"{args.host}:{args.port}{args.supervisor}: {e}",
+            file=sys.stderr,
+        )
         return 1
     finally:
         if bus is not None:
@@ -266,14 +273,45 @@ def cmd_wakeup(args) -> int:
     return _online(args, lambda proxy: proxy.wakeup() and None)
 
 
+def _default_bus_address() -> tuple[str, int]:
+    """Bus address from ``~/.chimera/chimera.config``, like the core CLIs.
+
+    The defaults used to be hardcoded ``127.0.0.1:6379`` — the *redis* port,
+    left over from the redis-bus era. Every lna40 deployment declares 7666,
+    so a bare invocation (including the one documented in docker-compose.yml)
+    failed with "could not resolve proxy for tcp://127.0.0.1:6379/...".
+    """
+    try:
+        from chimera.core.chimera_config import ChimeraConfig
+
+        config = ChimeraConfig.from_default()
+        return str(config.host), int(config.port)
+    except Exception:
+        # no config file / unreadable: fall back to chimera's own defaults
+        try:
+            from chimera.core.constants import (
+                MANAGER_DEFAULT_HOST,
+                MANAGER_DEFAULT_PORT,
+            )
+
+            return str(MANAGER_DEFAULT_HOST), int(MANAGER_DEFAULT_PORT)
+        except Exception:
+            return "127.0.0.1", 6379
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="chimera-supervisor",
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--host", default="127.0.0.1", help="chimera server host")
-    parser.add_argument("--port", type=int, default=6379, help="chimera server port")
+    host, port = _default_bus_address()
+    parser.add_argument(
+        "--host", default=host, help=f"chimera server host (default: {host})"
+    )
+    parser.add_argument(
+        "--port", type=int, default=port, help=f"chimera server port (default: {port})"
+    )
     parser.add_argument(
         "--supervisor", default="/Supervisor/0", help="supervisor controller location"
     )
@@ -285,7 +323,9 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("migrate", help="convert legacy files to the new format")
     p.add_argument("files", nargs="+")
-    p.add_argument("-o", "--output", help="directory for converted files (default: stdout)")
+    p.add_argument(
+        "-o", "--output", help="directory for converted files (default: stdout)"
+    )
     p.set_defaults(func=cmd_migrate)
 
     p = sub.add_parser("example", help="print an example checklist file")

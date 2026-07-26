@@ -44,6 +44,22 @@ _ROLES = (
     "weatherstations",
 )
 
+#: config role -> the Context attribute it populates (roles are singular in
+#: the config, plural lists on the context)
+_ROLE_CONTEXT_ATTR = {
+    "site": "site",
+    "telescope": "telescopes",
+    "camera": "cameras",
+    "dome": "domes",
+    "scheduler": "schedulers",
+    "robobs": "robobs",
+    "weatherstations": "weather_stations",
+}
+
+#: roles that get one flag PER instance (``weatherstations_01``, …). Every
+#: other role is addressed by its bare name from actions and conditions.
+_PLURAL_FLAG_ROLES = ("weatherstations",)
+
 #: roles whose flag is VOLATILE: their controllers (the chimera Scheduler,
 #: RobObs) come back OFF after a chimera restart - they never auto-resume -
 #: so any value persisted in state.db is stale. Left at "operating"/"error"
@@ -85,7 +101,10 @@ class Supervisor(ChimeraObject):
         self._running = True
         self._shutdown = threading.Event()
         self._trigger = threading.Event()
-        self._cycle_lock = threading.Lock()
+        # RLock, not Lock: run_action() takes it, and a checklist response
+        # may itself call back into run_action through ctx.run_action while
+        # the cycle already holds it (same thread -> must be reentrant).
+        self._cycle_lock = threading.RLock()
         self._worker: threading.Thread | None = None
 
     # ------------------------------------------------------------------
@@ -177,6 +196,24 @@ class Supervisor(ChimeraObject):
             self._connect_telescope_events()
             self._connect_scheduler_events()
             self._events_connected = True
+            # Rebuild the context HERE, for the same reason the events are
+            # connected here: during __start__ the bus is not serving yet, so
+            # get_proxy() fails and every role silently came up empty - a
+            # supervisor that looks healthy while supervising nothing.
+            with self._cycle_lock:
+                self.engine.ctx = self._build_context()
+            missing = self._verify_roles()
+            if missing:
+                message = (
+                    "supervisor role(s) configured but NOT resolved: "
+                    + ", ".join(missing)
+                    + " — checklist items guarding them cannot fire"
+                )
+                self.log.error(message)
+                try:
+                    self.notifier.broadcast(message)
+                except Exception:
+                    self.log.exception("could not broadcast missing-role alert")
             self.log.info("event subscription done; scheduling first checklist cycle")
         self.log.debug("control tick: triggering checklist cycle")
         self._trigger.set()
@@ -239,8 +276,26 @@ class Supervisor(ChimeraObject):
 
     def _flag_names(self, role: str) -> list[str]:
         """Flag-board names for a role: bare name for a single instance,
-        ``role_01``… for several (the naming the configs rely on)."""
+        ``role_01``… for several (the naming the configs rely on).
+
+        Only ``weatherstations`` pluralises.  Every flag-aware action and
+        condition addresses the other roles by their bare name
+        (``DomeAction`` writes ``"dome"``, ``TelescopeAction`` writes
+        ``"telescope"``), so pluralising them registered ``dome_01``/
+        ``dome_02`` flags that nothing ever read or wrote while the actions
+        auto-created an unregistered ``"dome"`` entry behind their backs.
+        """
         locations = self._locations.get(role, [])
+        if role not in _PLURAL_FLAG_ROLES:
+            if len(locations) > 1:
+                self.log.warning(
+                    "role %r has %d locations but a single flag board entry "
+                    "(%r): they share one flag",
+                    role,
+                    len(locations),
+                    role,
+                )
+            return [role]
         if len(locations) <= 1:
             return [role]
         return [f"{role}_{i + 1:02d}" for i in range(len(locations))]
@@ -271,8 +326,22 @@ class Supervisor(ChimeraObject):
                     proxy.__timeout__ = float(self["proxy_timeout"])
                 proxies.append(proxy)
             except Exception:
-                self.log.warning("could not get proxy for %s (%s)", role, location)
+                # ERROR, not WARNING: a configured role that resolves to
+                # nothing leaves every guard over it reading False, which
+                # disables close-down items instead of firing them.
+                self.log.error("could not get proxy for %s (%s)", role, location)
         return proxies
+
+    def _verify_roles(self) -> list[str]:
+        """Names of configured roles that resolved to no proxy at all."""
+        missing = []
+        for role in _ROLES:
+            if not self._locations.get(role):
+                continue  # not configured for this site: legitimately absent
+            attribute = _ROLE_CONTEXT_ATTR[role]
+            if not getattr(self.engine.ctx, attribute, None):
+                missing.append(role)
+        return missing
 
     def _build_context(self) -> Context:
         return Context(
@@ -311,12 +380,47 @@ class Supervisor(ChimeraObject):
             f"checklist loaded: {len(items)} item(s) from {directory} "
             f"({len(self.engine.manual_items())} manual)"
         )
+        if not items:
+            # an empty checklist is a running supervisor that supervises
+            # nothing - never let that pass as a routine info line
+            message = f"checklist is EMPTY: no items found in {directory}"
+            self.log.warning(message)
+            try:
+                self.notifier.broadcast(message)
+            except Exception:
+                self.log.exception("could not broadcast empty-checklist warning")
+            return message
         self.log.info(message)
         return message
 
+    #: how long an operator command waits for the current checklist cycle
+    #: before answering "busy" (a cycle can legitimately take proxy_timeout)
+    _OPERATOR_LOCK_WAIT = 30.0
+
     def run_action(self, name: str) -> bool:
-        """Run an item's responses immediately (skips its conditions)."""
-        return self.engine.run_action(name)
+        """Run an item's responses immediately (skips its conditions).
+
+        Serialised against the checklist cycle: this is reachable from the
+        Telegram thread, from _run_hook threads and from the CLI over the
+        bus, none of which held _cycle_lock, so `/run park_telescope` could
+        drive the same telescope and dome proxies as a concurrent
+        open_dome_at_sunset — or run while reload_checklist was swapping
+        engine.items and engine.ctx underneath it.
+
+        The wait is BOUNDED: an operator command that cannot get in says so
+        instead of hanging the bot behind a slow cycle.
+        """
+        if not self._cycle_lock.acquire(timeout=self._OPERATOR_LOCK_WAIT):
+            self.log.warning(
+                "run_action(%r): checklist cycle still busy after %.0f s; refusing",
+                name,
+                self._OPERATOR_LOCK_WAIT,
+            )
+            return False
+        try:
+            return self.engine.run_action(name)
+        finally:
+            self._cycle_lock.release()
 
     def items(self) -> list[str]:
         return [item.name for item in self.engine.items]
@@ -426,10 +530,23 @@ class Supervisor(ChimeraObject):
         ).start()
 
     def _watch_tracking_stopped(self, status):
-        # deliberately not broadcast: the scheduler stops tracking at the end of
-        # every program, so this fires many times a night with status OK and is
-        # noise on telegram. Abnormal stops are still handled by the hook below.
+        # status OK is deliberately NOT broadcast: the scheduler stops
+        # tracking at the end of every program, so it fires many times a
+        # night and was pure noise on telegram.
         self._set_flag_safe("telescope", Flag.READY)
+        if status == TelescopeStatus.OK:
+            return
+
+        # Anything else IS abnormal and must reach the operator on its own,
+        # not only through an optional checklist hook: routing it solely to
+        # ON_OBJECT_TOO_LOW meant that on a site which never defined that
+        # item (every lna40 checklist) an abnormal stop surfaced nowhere but
+        # chimera.log.
+        self.log.warning("telescope tracking stopped abnormally: %s", status)
+        try:
+            self.notifier.broadcast(f"Telescope tracking stopped: {status}")
+        except Exception:
+            self.log.exception("could not broadcast abnormal tracking stop")
         if status == TelescopeStatus.OBJECT_TOO_LOW and self.engine.item(
             ON_OBJECT_TOO_LOW
         ):
