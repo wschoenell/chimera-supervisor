@@ -44,6 +44,14 @@ _ROLES = (
     "weatherstations",
 )
 
+#: roles whose flag is VOLATILE: their controllers (the chimera Scheduler,
+#: RobObs) come back OFF after a chimera restart - they never auto-resume -
+#: so any value persisted in state.db is stale. Left at "operating"/"error"
+#: they deadlock the night: open_dome_at_sunset holds while the scheduler is
+#: operating and start_robobs holds while robobs is operating (2026-07-26,
+#: and hand-cleared ~10 times over earlier nights). Reset to READY at boot.
+_VOLATILE_ROLES = ("scheduler", "robobs")
+
 
 class Supervisor(ChimeraObject):
     __config__ = {
@@ -106,6 +114,11 @@ class Supervisor(ChimeraObject):
             self._locations[role] = locations
             for name in self._flag_names(role):
                 self.store.register_instrument(name)
+
+        # reconcile the volatile flags with reality: a restarted scheduler /
+        # robobs is always OFF, so clear any stale operating/error persisted
+        # across the restart (issue #15)
+        self._reset_volatile_flags()
 
         self._setup_notifier()
 
@@ -231,6 +244,22 @@ class Supervisor(ChimeraObject):
         if len(locations) <= 1:
             return [role]
         return [f"{role}_{i + 1:02d}" for i in range(len(locations))]
+
+    def _reset_volatile_flags(self) -> None:
+        """Clear stale scheduler/robobs flags a restart persisted (issue #15).
+
+        Only touches CONFIGURED roles (a registered flag) and only the
+        volatile ones, so weather/dome/site persistence is untouched; a
+        LOCK is an operator decision and is never overridden.
+        """
+        registered = set(self.store.instruments())
+        for role in _VOLATILE_ROLES:
+            for name in self._flag_names(role):
+                if name not in registered:
+                    continue
+                if self.store.get_flag(name) == Flag.LOCK:
+                    continue
+                self.store.set_flag(name, Flag.READY)
 
     def _proxies(self, role: str) -> list:
         proxies = []

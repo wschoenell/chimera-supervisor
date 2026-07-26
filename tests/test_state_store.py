@@ -140,3 +140,49 @@ def test_unlock_with_key_not_held_is_a_quiet_noop(store):
     assert store.unlock("dome", "dew") is False
     assert store.get_flag("dome") == Flag.LOCK
     assert store.active_keys("dome") == ["sunup"]
+
+
+def test_volatile_flags_reset_at_boot():
+    """Issue #15: scheduler/robobs flags persist in state.db but their
+    controllers come back OFF after a chimera restart, so a stale
+    operating/error deadlocks the night (open_dome_at_sunset holds while
+    the scheduler is operating). __start__ resets the volatile flags to
+    READY; non-volatile persistence (dome, site) is untouched."""
+    from chimera_supervisor.controllers.supervisor import Supervisor
+
+    store = StateStore(":memory:")
+    for name in ("scheduler", "robobs", "dome"):
+        store.register_instrument(name)
+    store.set_flag("scheduler", Flag.OPERATING)  # stale across a restart
+    store.set_flag("robobs", Flag.ERROR)
+    store.set_flag("dome", Flag.OPERATING)  # non-volatile: must survive
+
+    sup = Supervisor.__new__(Supervisor)
+    sup.store = store
+    sup._locations = {
+        "scheduler": ["/Scheduler/sched"],
+        "robobs": ["/RobObs/robobs"],
+    }
+    sup._reset_volatile_flags()
+
+    assert store.get_flag("scheduler") == Flag.READY
+    assert store.get_flag("robobs") == Flag.READY
+    assert store.get_flag("dome") == Flag.OPERATING
+
+
+def test_volatile_reset_skips_unconfigured_and_locked():
+    """A role with no configured location has no flag to reset; a locked
+    volatile flag stays locked (a lock is an operator decision, not stale
+    controller state)."""
+    from chimera_supervisor.controllers.supervisor import Supervisor
+
+    store = StateStore(":memory:")
+    store.register_instrument("scheduler")
+    store.lock("scheduler", "operator")
+
+    sup = Supervisor.__new__(Supervisor)
+    sup.store = store
+    sup._locations = {"scheduler": ["/Scheduler/sched"], "robobs": []}
+    sup._reset_volatile_flags()  # must not raise on the empty robobs role
+
+    assert store.get_flag("scheduler") == Flag.LOCK
