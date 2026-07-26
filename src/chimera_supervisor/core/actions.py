@@ -229,11 +229,15 @@ class DomeAction(Action):
             elif self.do == "slew":
                 azimuth = self.azimuth
                 if azimuth == "oppose_sun":
+                    # sunpos() returns (alt, az) floats on the chimera fork
+                    # but a Position of Coords upstream; Coord arithmetic
+                    # yields a Coord, which f"{...:.1f}" cannot format
                     _, sun_az = ctx.site.sunpos()
-                    azimuth = (sun_az + 180.0) % 360.0
+                    azimuth = (float(sun_az) + 180.0) % 360.0
+                azimuth = float(azimuth)
                 dome.stand()
                 _broadcast(ctx, f"Moving dome to azimuth {azimuth:.1f}...")
-                dome.slew_to_az(float(azimuth))
+                dome.slew_to_az(azimuth)
 
 
 # --------------------------------------------------------------------------
@@ -875,7 +879,9 @@ class RunScriptAction(Action):
         if not text:
             return
         level = logging.INFO if status == 0 else logging.WARNING
-        ctx.log.log(level, "run_script %s exited %d; output:\n%s", self.path, status, text)
+        ctx.log.log(
+            level, "run_script %s exited %d; output:\n%s", self.path, status, text
+        )
 
     def _run_and_report(self, ctx: Context) -> None:
         """Background worker: never raises, only broadcasts the outcome."""

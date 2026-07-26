@@ -54,6 +54,20 @@ def test_dome_slew_opposes_sun():
     assert ctx.domes[0].azimuth == 240.0
 
 
+def test_dome_slew_opposes_sun_with_position_of_coords():
+    # production Site.sunpos() returns a Position of Coords (2026-07-26
+    # 02:58: Coord arithmetic survived to the f"{azimuth:.1f}" broadcast,
+    # crashed open_dome_at_sunset and left the dome not tracking)
+    from chimera.util.coord import Coord
+    from chimera.util.position import Position
+
+    ctx = make_context()
+    ctx.site.sun_alt_az = Position.from_alt_az(Coord.from_d(-10.0), Coord.from_d(60.0))
+    run({"action": "dome", "do": "slew", "azimuth": "oppose_sun"}, ctx)
+    assert ctx.domes[0].azimuth == 240.0
+    assert isinstance(ctx.domes[0].azimuth, float)
+
+
 def test_telescope_park_sets_close_flag():
     ctx = make_context()
     ctx.telescopes[0].parked = False
