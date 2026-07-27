@@ -47,10 +47,15 @@ class TelegramNotifier:
         listen_ids: list[int],
         supervisor: SupervisorPort | None = None,
         log: logging.Logger | None = None,
+        verify_ssl: bool = True,
     ):
         self.log = log or logging.getLogger(__name__)
         self._broadcast_ids = list(broadcast_ids)
         self._listen_ids = list(listen_ids)
+        # when False, send_photo skips TLS verification for every https host,
+        # not just private ones — for observatories whose public-IP webcams
+        # still serve self-signed certificates
+        self._verify_ssl = verify_ssl
         self._commands = (
             OperatorCommands(supervisor) if supervisor is not None else None
         )
@@ -229,16 +234,19 @@ class TelegramNotifier:
             with open(path, "rb") as fp:
                 return fp.read()
 
-        # Certificate verification is bypassed ONLY for hosts on the local
-        # network: it used to be unconditional, so a send_photo pointed at a
-        # public endpoint silently lost TLS authentication too.
-        if parsed.scheme == "https" and self._is_private_host(parsed.hostname or ""):
+        # Certificate verification is bypassed for hosts on the local network
+        # (always) and for every host when verify_ssl is off (observatories
+        # whose external self-signed feeds would otherwise fail). By default
+        # only private hosts are trusted, so a send_photo pointed at a public
+        # endpoint keeps its TLS authentication.
+        insecure = not self._verify_ssl or self._is_private_host(
+            parsed.hostname or ""
+        )
+        if parsed.scheme == "https" and insecure:
             context = ssl.create_default_context()
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
-            self.log.debug(
-                "photo host %s is private: TLS not verified", parsed.hostname
-            )
+            self.log.debug("photo host %s: TLS not verified", parsed.hostname)
         else:
             context = None
         with urllib.request.urlopen(url, timeout=30, context=context) as response:

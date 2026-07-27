@@ -85,6 +85,10 @@ class Supervisor(ChimeraObject):
         "telegram_token": None,
         "telegram_broadcast_ids": None,  # chat ids: YAML list or comma-separated
         "telegram_listen_ids": None,  # chat ids allowed to answer questions
+        # verify TLS when send_photo fetches an https webcam/all-sky image;
+        # set False for observatories whose feeds use self-signed certs
+        # (private-network hosts are trusted regardless)
+        "photo_verify_ssl": True,
         "freq": 0.01,  # checklist frequency (Hz)
         "max_weather_age": 10.0,  # minutes before weather data is stale
         # bound on every proxied instrument call (seconds): a hung
@@ -271,6 +275,7 @@ class Supervisor(ChimeraObject):
             listen_ids=_ids("telegram_listen_ids"),
             supervisor=self,
             log=self.log,
+            verify_ssl=bool(self["photo_verify_ssl"]),
         )
         self.notifier.start()
 

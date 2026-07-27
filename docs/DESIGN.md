@@ -165,6 +165,9 @@ state_db:                NEW  path of runtime-state sqlite (default ~/.chimera/s
 telegram_token:          was telegram-token
 telegram_broadcast_ids:  was telegram-broascast-ids (typo fixed)
 telegram_listen_ids:     was telegram-listen-ids
+photo_verify_ssl:        NEW  verify TLS on send_photo fetches (default True;
+                              False trusts self-signed external feeds too —
+                              private-network hosts are trusted regardless)
 freq:                    unchanged (Hz)
 max_weather_age:         was max_mins (minutes)
 ```
