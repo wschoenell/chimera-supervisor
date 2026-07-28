@@ -1,0 +1,32 @@
+# Weather-station health, collapsed from manager_checkws.yaml (three
+# stations at T80S -> the single fake station, flag "weatherstations").
+checklist:
+  weather_station_ok:
+    description: Station data fresh but flag not ready -> mark it ready
+    conditions:
+      - condition: weather_station
+        station: 0
+        state: ok
+      - condition: flag
+        instrument: weatherstations
+        is_not: ready
+    responses:
+      - action: set_flag
+        instrument: weatherstations
+        flag: ready
+
+  weather_station_stale:
+    description: Station data stale but flag not close -> mark it close
+    conditions:
+      - condition: weather_station
+        station: 0
+        state: stale
+      - condition: flag
+        instrument: weatherstations
+        is_not: close
+    responses:
+      - action: set_flag
+        instrument: weatherstations
+        flag: close
+      - action: notify
+        message: Weather station data is stale!

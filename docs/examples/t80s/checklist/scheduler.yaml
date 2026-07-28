@@ -1,0 +1,81 @@
+# Scheduler-related items, from manager_makeskyflat.yaml,
+# manager_stopshedendofnight.yaml and manager_schedulerinerror.yaml.
+# Queue files point at chimera's own sample-sched.yaml (the fake camera
+# executes it); lamp-off scripts and the unregistered SkyFlat flag dropped.
+checklist:
+  take_sky_flats:
+    # makeskyflat TakeSkyFlats: evening flats right around sunset
+    description: Evening sky flats (sunset -9m to +12m)
+    on_error: abort
+    conditions:
+      - condition: time
+        after: sunset
+        offset: -9m
+      - condition: time
+        before: sunset
+        offset: 12m
+      - condition: dome
+        slit: open
+      - condition: flag
+        instrument: scheduler
+        is_not: operating
+    responses:
+      - action: telescope
+        do: open_cover
+      - action: configure_scheduler
+        file: /home/william/chimera/chimera/src/chimera/controllers/scheduler/sample-sched.yaml
+      - action: scheduler
+        do: start
+
+  stop_scheduler_end_of_night:
+    # stopshedendofnight StopSchedEnd
+    description: Stop the queue in the morning-twilight window
+    on_error: abort
+    conditions:
+      - condition: time
+        after: sunrise_twilight_begin
+        offset: 1188s
+      - condition: time
+        before: sunrise_twilight_begin
+        offset: 36m
+      - condition: dome
+        slit: open
+      - condition: flag
+        instrument: scheduler
+        is: operating
+    responses:
+      - action: stop_all
+
+  take_sky_flats_end:
+    # stopshedendofnight TakeSkyFlatsEnd (robobs stop dropped)
+    description: Morning sky flats after the queue stops
+    on_error: abort
+    conditions:
+      - condition: time
+        after: sunrise_twilight_begin
+        offset: 39m
+      - condition: time
+        before: sunrise_twilight_begin
+        offset: 48m
+      - condition: dome
+        slit: open
+      - condition: flag
+        instrument: scheduler
+        is_not: operating
+    responses:
+      - action: dome
+        do: close_flap
+      - action: configure_scheduler
+        file: /home/william/chimera/chimera/src/chimera/controllers/scheduler/sample-sched.yaml
+      - action: scheduler
+        do: start
+
+  on_scheduler_error:
+    # schedulerinerror SchedulerInError, renamed to the 2.0 event-hook name:
+    # the supervisor runs this automatically when the scheduler reports an
+    # ERROR program (it is also listed as a manual procedure).
+    description: Scheduler reported an error - stop everything
+    responses:
+      - action: notify
+        message: Scheduler in ERROR - stopping everything.
+      - action: stop_all

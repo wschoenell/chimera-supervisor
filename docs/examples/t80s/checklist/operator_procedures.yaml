@@ -1,0 +1,82 @@
+# Manual operator procedures (no conditions: run via Telegram /list, /run
+# or the CLI). From manager_opentelescope.yaml, manager_closetelescope.yaml,
+# manager_operatorLock.yaml, manager_openatsunset.yaml (OpposeSun) and
+# manager_powercut.yaml. The originals gated these on AskListener
+# questions; in 2.0 manual runs skip conditions, so the confirmations
+# happen by choosing the item in /list.
+checklist:
+  open_telescope:
+    # opentelescope OpenTelescope
+    description: Unpark and open everything (manual)
+    responses:
+      - action: telescope
+        do: unpark
+      - action: dome
+        do: open_slit
+      - action: telescope
+        do: open_cover
+      - action: dome
+        do: open_flap
+
+  park_telescope:
+    # closetelescope ParkTelescope
+    description: Stop, close and park everything (manual)
+    responses:
+      - action: stop_all
+      - action: fan
+        do: switch_off
+        fan: /FakeFan/fake
+      - action: telescope
+        do: close_cover
+      - action: dome
+        do: close_slit
+      - action: dome
+        do: slew
+        azimuth: 90
+      - action: telescope
+        do: park
+
+  operator_lock:
+    # operatorLock OperatorLock
+    description: Full shutdown and lock the dome with the operator key (manual)
+    responses:
+      - action: stop_all
+      - action: fan
+        do: switch_off
+        fan: /FakeFan/fake
+      - action: telescope
+        do: close_cover
+      - action: dome
+        do: close_slit
+      - action: dome
+        do: slew
+        azimuth: 90
+      - action: lock
+        instrument: dome
+        key: operator
+
+  operator_unlock:
+    # operatorLock OperatorUnLock
+    description: Release the operator key and mark the dome ready (manual)
+    responses:
+      - action: unlock
+        instrument: dome
+        key: operator
+      - action: set_flag
+        instrument: dome
+        flag: ready
+
+  oppose_sun:
+    # openatsunset OpposeSun
+    description: Point the dome away from the sun (manual)
+    responses:
+      - action: dome
+        do: slew
+        azimuth: oppose_sun
+
+  power_off:
+    # powercut PowerOff
+    description: Broadcast a power-cut warning (manual)
+    responses:
+      - action: notify
+        message: Power cut at the observatory!

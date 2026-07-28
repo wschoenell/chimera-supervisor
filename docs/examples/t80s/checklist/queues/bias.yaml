@@ -1,0 +1,15 @@
+# Morning bias queue for the fake-observatory soak test.
+# Mirrors what T80S loaded at sunrise (bias.yaml): exposures only, no
+# pointing — the telescope is parked and the dome closed when this runs.
+programs:
+  - name: morning_bias
+    pi: supervisor soak test
+    priority: 1
+    actions:
+      - action: expose
+        frames: 10
+        exptime: 0
+        shutter: CLOSE
+        image_type: bias
+        object_name: BIAS
+        filename: bias-$DATE-$TIME

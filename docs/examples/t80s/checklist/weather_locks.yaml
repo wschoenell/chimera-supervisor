@@ -1,0 +1,172 @@
+# Weather watchdogs, from manager_lockall.yaml (the current generation of
+# the T80S weather safety items), manager_transplock.yaml,
+# manager_transpUnlock.yaml and manager_unlockdew.yaml.
+# The several physical fans collapse into /FakeFan/fake.
+checklist:
+  close_on_humidity:
+    # lockall CloseOnHumidity
+    description: Humidity above 85% -> close everything, lock dome (key humidity)
+    conditions:
+      - condition: humidity
+        above: 85
+      - condition: flag
+        instrument: dome
+        not_locked_with_key: humidity
+    responses:
+      - action: fan
+        do: switch_off
+        fan: /FakeFan/fake
+      - action: stop_all
+      - action: telescope
+        do: close_cover
+      - action: dome
+        do: close_slit
+      - action: lock
+        instrument: dome
+        key: humidity
+
+  close_on_dew:
+    # lockall CloseOnDew
+    description: Temperature within 4 C of dew point -> close everything, lock dome (key dew)
+    conditions:
+      - condition: dew_gap
+        below: 4
+      - condition: flag
+        instrument: dome
+        not_locked_with_key: dew
+    responses:
+      - action: fan
+        do: switch_off
+        fan: /FakeFan/fake
+      - action: stop_all
+      - action: telescope
+        do: close_cover
+      - action: dome
+        do: close_slit
+      - action: lock
+        instrument: dome
+        key: dew
+
+  close_on_wind:
+    # lockall CloseOnWind (fake wind is constant 10 m/s: soaks the quiet path)
+    description: Wind above 16 m/s -> close everything, lock dome (key wind)
+    conditions:
+      - condition: wind_speed
+        above: 16
+      - condition: flag
+        instrument: dome
+        not_locked_with_key: wind
+    responses:
+      - action: fan
+        do: switch_off
+        fan: /FakeFan/fake
+      - action: stop_all
+      - action: telescope
+        do: close_cover
+      - action: dome
+        do: close_slit
+      - action: lock
+        instrument: dome
+        key: wind
+
+  lock_on_low_transparency:
+    # transplock TransparencyLock (site-level lock; fake transparency is 84%)
+    description: Sky transparency below 35% with dome open -> close and lock the site
+    conditions:
+      - condition: transparency
+        below: 35
+      - condition: dome
+        slit: open
+      - condition: flag
+        instrument: site
+        not_locked_with_key: transparency
+    responses:
+      - action: fan
+        do: switch_off
+        fan: /FakeFan/fake
+      - action: stop_all
+      - action: telescope
+        do: close_cover
+      - action: dome
+        do: close_slit
+      - action: lock
+        instrument: site
+        key: transparency
+
+  daylight_lock_on_low_transparency:
+    # transplock DailightTransparencyLock
+    description: Low transparency while closed -> hold the site lock
+    conditions:
+      - condition: transparency
+        below: 35
+      - condition: dome
+        slit: closed
+      - condition: flag
+        instrument: site
+        not_locked_with_key: transparency
+    responses:
+      - action: lock
+        instrument: site
+        key: transparency
+
+  unlock_transparency:
+    # transpUnlock TestTransparencyUnLock (all-sky photo dropped)
+    description: Transparency above 40% for 15 minutes -> release the site lock
+    conditions:
+      - condition: transparency
+        above: 40
+        for: 15m
+      - condition: flag
+        instrument: site
+        locked_with_key: transparency
+    responses:
+      - action: unlock
+        instrument: site
+        key: transparency
+      - action: set_flag
+        instrument: site
+        flag: ready
+
+  unlock_dew:
+    # unlockdew UnlockDew (the only automatic unlock in production)
+    description: Dew gap above 5 C for 30 minutes -> release the dew key
+    run: always
+    conditions:
+      - condition: dew_gap
+        above: 5
+        for: 30m
+    responses:
+      - action: unlock
+        instrument: dome
+        key: dew
+
+  unlock_humidity:
+    # ADDED (not in T80S, where this was manual): mirrors unlock_dew so the
+    # daily humidity lock cycles instead of accumulating forever.
+    description: Humidity below 80% for 30 minutes -> release the humidity key
+    conditions:
+      - condition: humidity
+        below: 80
+        for: 30m
+      - condition: flag
+        instrument: dome
+        locked_with_key: humidity
+    responses:
+      - action: unlock
+        instrument: dome
+        key: humidity
+
+  unlock_wind:
+    # ADDED (not in T80S): mirrors unlock_dew for the wind key.
+    description: Wind below 12 m/s for 30 minutes -> release the wind key
+    conditions:
+      - condition: wind_speed
+        below: 12
+        for: 30m
+      - condition: flag
+        instrument: dome
+        locked_with_key: wind
+    responses:
+      - action: unlock
+        instrument: dome
+        key: wind

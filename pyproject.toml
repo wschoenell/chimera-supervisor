@@ -1,0 +1,46 @@
+[project]
+name = "chimera-supervisor"
+version = "2.0.0.dev0"
+description = "Observatory supervisor (checklist automation, safety locks and Telegram operator interface) for the chimera observatory control system"
+license = "GPL-2.0-or-later"
+authors = [
+    { name = "Tiago Ribeiro", email = "tribeiro@ufs.br" },
+    { name = "William Schoenell", email = "wschoenell@gmail.com" },
+]
+readme = "README.rst"
+requires-python = ">=3.13"
+dependencies = [
+    "chimera",
+    "python-telegram-bot>=21",
+    "pyyaml>=6.0.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-cov>=7.0",
+    "ruff>=0.14",
+]
+
+[project.scripts]
+chimera-supervisor = "chimera_supervisor.cli.supervisor:main"
+
+[project.urls]
+source = "https://github.com/astroufsc/chimera-supervisor"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/chimera_supervisor"]
+
+[tool.uv.sources]
+chimera = { path = "../chimera" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--import-mode=importlib"
+
+[tool.ruff.lint]
+select = ["N", "I", "UP", "F", "E4", "E7", "E9"]
