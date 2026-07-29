@@ -152,6 +152,34 @@ procedure:
     assert "manual only" in ctx.notifier.messages
 
 
+def test_menu_hides_marked_items_and_event_hooks():
+    document = """
+procedure:
+  responses:
+    - action: notify
+      message: hi
+recovery:
+  menu: false
+  responses:
+    - action: notify
+      message: recover
+on_scheduler_error:
+  responses:
+    - action: notify
+      message: program failed
+"""
+    engine, ctx = make_engine(document)
+    # the hook is not an operator procedure at all; `recovery` is one, it is
+    # just kept off the buttons
+    assert engine.manual_items() == ["procedure", "recovery"]
+    assert engine.menu_items() == ["procedure"]
+    # and nothing here runs by itself
+    engine.run_cycle()
+    assert ctx.notifier.messages == []
+    assert engine.run_action("on_scheduler_error")
+    assert "program failed" in ctx.notifier.messages
+
+
 def test_run_action_unknown_item():
     engine, _ = make_engine("x:\n  responses:\n    - action: stop_all\n")
     assert engine.run_action("nope") is False

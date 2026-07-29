@@ -16,6 +16,7 @@ File shape
       <item_name>:
         description: <text>            # optional, shown in logs
         active: true|false             # default true; inactive items only run manually
+        menu: true|false               # default true; false hides it from /list
         run: on_change|always          # default on_change
         on_error: continue|abort       # default continue
         conditions:                    # optional; omit for manual procedures
@@ -38,6 +39,13 @@ Semantics
   failure (don't take flats if the dome didn't open).
 * Items without ``conditions`` never run automatically; trigger them with
   ``chimera-supervisor run <item>`` or Telegram ``/run <item>`` / ``/list``.
+* ``menu: false`` keeps such an item runnable by name but off the ``/list``
+  button menu — for recovery escape hatches and one-off tools that would
+  otherwise bury the procedures an operator actually needs at night.
+* The event hooks ``on_scheduler_error`` and ``on_object_too_low`` are run
+  by the supervisor itself when the matching chimera event arrives.  They
+  carry no conditions but are not operator procedures: they never appear in
+  ``/list`` and Telegram ``/run`` will not start them (the CLI still can).
 
 Durations
 ---------

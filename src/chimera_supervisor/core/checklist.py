@@ -25,7 +25,9 @@ A checklist file is a mapping of item names to definitions::
 
 (The ``checklist:`` wrapper is optional.)  Items with no ``conditions:`` are
 manual actions: they never run automatically and can be triggered by name
-(CLI ``run-action`` or Telegram ``/run``).
+(CLI ``run-action`` or Telegram ``/run``) — except the event hooks below,
+which the supervisor fires by itself.  ``menu: false`` keeps a manual item
+runnable by name but off the operator's ``/list`` menu.
 """
 
 import pathlib
@@ -38,7 +40,23 @@ from chimera_supervisor.core.conditions import Condition, parse_condition
 from chimera_supervisor.core.exceptions import ConfigError
 from chimera_supervisor.core.parsing import as_bool, as_choice, check_keys
 
-_ITEM_KEYS = {"description", "active", "run", "on_error", "conditions", "responses"}
+_ITEM_KEYS = {
+    "description",
+    "active",
+    "menu",
+    "run",
+    "on_error",
+    "conditions",
+    "responses",
+}
+
+#: item names the supervisor runs in reaction to chimera events (see
+#: :mod:`chimera_supervisor.controllers.supervisor`).  They carry no
+#: conditions, so without this list the engine would take them for
+#: operator procedures and offer them in the ``/list`` menu.
+ON_SCHEDULER_ERROR = "on_scheduler_error"
+ON_OBJECT_TOO_LOW = "on_object_too_low"
+EVENT_HOOKS = frozenset({ON_SCHEDULER_ERROR, ON_OBJECT_TOO_LOW})
 
 
 @dataclass
@@ -48,6 +66,9 @@ class ChecklistItem:
     responses: list[Action] = field(default_factory=list)
     description: str = ""
     active: bool = True
+    #: offer this procedure in the operator menu (Telegram ``/list``).  False
+    #: hides it there; it stays runnable by name from the CLI and ``/run``.
+    menu: bool = True
     #: "on_change": fire responses only when the aggregate condition status
     #: flips to True; "always": fire on every cycle where conditions hold.
     run: str = "on_change"
@@ -61,6 +82,16 @@ class ChecklistItem:
     def automatic(self) -> bool:
         return bool(self.conditions)
 
+    @property
+    def manual(self) -> bool:
+        """An operator procedure: no conditions (or switched off), and not an
+        event hook the supervisor fires by itself."""
+        return (not self.active or not self.automatic) and self.name not in EVENT_HOOKS
+
+    @property
+    def in_menu(self) -> bool:
+        return self.manual and self.menu
+
     def to_config(self) -> dict:
         """Serialize back to the new YAML format (without the name key)."""
         out: dict = {}
@@ -68,6 +99,8 @@ class ChecklistItem:
             out["description"] = self.description
         if not self.active:
             out["active"] = False
+        if not self.menu:
+            out["menu"] = False
         if self.run != "on_change":
             out["run"] = self.run
         if self.on_error != "continue":
@@ -100,6 +133,9 @@ def parse_item(name: str, cfg: object, source: str) -> ChecklistItem:
         description=str(cfg.get("description", "")),
         active=as_bool(
             cfg.get("active", True), kind=f"item {name!r}", key="active", source=source
+        ),
+        menu=as_bool(
+            cfg.get("menu", True), kind=f"item {name!r}", key="menu", source=source
         ),
         run=as_choice(
             cfg.get("run", "on_change"),

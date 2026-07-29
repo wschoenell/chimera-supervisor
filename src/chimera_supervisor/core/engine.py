@@ -88,9 +88,12 @@ class Engine:
     def manual_items(self) -> list[str]:
         """Items runnable by hand — historically the inactive ones (they are
         the operator-triggered procedures)."""
-        return [
-            item.name for item in self.items if not item.active or not item.automatic
-        ]
+        return [item.name for item in self.items if item.manual]
+
+    def menu_items(self) -> list[str]:
+        """The manual items to offer in the operator menu: everything
+        :meth:`manual_items` returns except those marked ``menu: false``."""
+        return [item.name for item in self.items if item.in_menu]
 
     # ------------------------------------------------------------------
 

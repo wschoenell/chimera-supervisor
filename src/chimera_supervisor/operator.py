@@ -26,6 +26,8 @@ class SupervisorPort(Protocol):
 
     def manual_items(self) -> list[str]: ...
 
+    def menu_items(self) -> list[str]: ...
+
     def run_action(self, name: str) -> bool: ...
 
     def status_summary(self) -> str: ...
@@ -90,7 +92,9 @@ class OperatorCommands:
         return Reply(HELP)
 
     def _cmd_list(self, args: list[str]) -> Reply:
-        items = self._supervisor.manual_items()
+        # the menu, not every runnable item: procedures marked `menu: false`
+        # stay available to /run by name but do not clutter the buttons
+        items = self._supervisor.menu_items()
         if not items:
             return Reply("No procedure available.")
         return Reply(

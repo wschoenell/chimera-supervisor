@@ -14,6 +14,9 @@ class FakeSupervisor:
         self.locked: list[tuple[str, str]] = []
 
     def manual_items(self):
+        return ["park_telescope", "open_up", "hidden_recovery"]
+
+    def menu_items(self):
         return ["park_telescope", "open_up"]
 
     def run_action(self, name):
@@ -47,6 +50,14 @@ def test_list_returns_buttons():
         ("park_telescope", "run:park_telescope"),
         ("open_up", "run:open_up"),
     ]
+
+
+def test_hidden_items_are_off_the_menu_but_still_runnable():
+    commands, supervisor = make()
+    menu = [value for _, value in commands.handle("list", []).buttons]
+    assert "hidden_recovery" not in menu
+    assert "finished" in commands.handle("run", ["hidden_recovery"]).text
+    assert supervisor.ran == ["hidden_recovery"]
 
 
 def test_button_press_runs_item():

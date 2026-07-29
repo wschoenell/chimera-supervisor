@@ -30,9 +30,11 @@ from chimera_supervisor.core.flags import InstrumentOperationFlag as Flag
 from chimera_supervisor.notification import NullNotifier
 from chimera_supervisor.persistence.state import StateStore
 
-#: checklist item names run in reaction to chimera events, when defined
-ON_SCHEDULER_ERROR = "on_scheduler_error"
-ON_OBJECT_TOO_LOW = "on_object_too_low"
+#: checklist item names run in reaction to chimera events, when defined.
+#: They live in core.checklist so the engine can tell them apart from the
+#: operator procedures they otherwise look like (both carry no conditions).
+ON_SCHEDULER_ERROR = checklist.ON_SCHEDULER_ERROR
+ON_OBJECT_TOO_LOW = checklist.ON_OBJECT_TOO_LOW
 
 _ROLES = (
     "site",
@@ -432,6 +434,9 @@ class Supervisor(ChimeraObject):
 
     def manual_items(self) -> list[str]:
         return self.engine.manual_items()
+
+    def menu_items(self) -> list[str]:
+        return self.engine.menu_items()
 
     def activate(self, name: str) -> bool:
         item = self.engine.item(name)
