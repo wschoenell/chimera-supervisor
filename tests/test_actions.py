@@ -167,6 +167,18 @@ def test_run_script(tmp_path):
     assert marker.exists()
 
 
+def test_run_script_expands_home_and_vars_in_existence_check(tmp_path, monkeypatch):
+    ctx = make_context()
+    marker = tmp_path / "ran"
+    script = tmp_path / "do.sh"
+    script.write_text(f"#!/bin/sh\ntouch {marker}\n")
+    script.chmod(0o755)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    run({"action": "run_script", "path": "$HOME/do.sh"}, ctx)
+    run({"action": "run_script", "path": "~/do.sh"}, ctx)
+    assert marker.exists()
+
+
 def test_run_script_missing_or_failing(tmp_path):
     ctx = make_context()
     with pytest.raises(ActionError):
