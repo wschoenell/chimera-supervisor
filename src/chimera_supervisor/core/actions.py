@@ -927,7 +927,10 @@ class RunScriptAction(Action):
         # are all legitimate and none of them exist on disk. Only refuse
         # when the first token looks like a path AND is missing.
         looks_like_path = os.sep in executable or executable.startswith(".")
-        if looks_like_path and not os.path.exists(executable):
+        # the shell will expand ~ and $VARs; the existence check must too,
+        # or `$HOME/x.sh` is refused even though it would have run fine
+        expanded = os.path.expanduser(os.path.expandvars(executable))
+        if looks_like_path and not os.path.exists(expanded):
             _broadcast(ctx, f"Could not find script {self.path} to run.")
             raise ActionError(f"script not found: {self.path}")
         if not looks_like_path and shutil.which(executable) is None:
